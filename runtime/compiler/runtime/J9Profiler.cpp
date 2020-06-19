@@ -942,6 +942,8 @@ TR_ValueProfileInfoManager::getProfiledValueInfo(TR::Node *node, TR::Compilation
       uint32_t source)
    {
    TR_ValueProfileInfoManager *manager = TR_ValueProfileInfoManager::get(comp);
+   if (manager)
+      printf(", manager"); fflush(stdout);
    return manager ? manager->getValueInfo(node, comp, kind, source) : NULL;
    }
 
@@ -969,23 +971,50 @@ TR_ValueProfileInfoManager::getValueInfo(TR_ByteCodeInfo &bcInfo, TR::Compilatio
    bool external = source == allProfileInfo || source == justInterpreterProfileInfo;
 
    if (internal)
+      printf(", internal"); fflush(stdout);
+   if (external)
+      printf(", external"); fflush(stdout);
+
+   if (internal)
       {
-      if (!info || info->getTotalFrequency() == 0)
+      if (!info || info->getTotalFrequency() == 0){
+         printf(", HashTableProfiler"); fflush(stdout);
+         if(!info){ printf(", !info"); fflush(stdout); }
+         else if(info->getTotalFrequency() == 0) {printf(", info->getTotalFrequency() == 0"); fflush(stdout);}
          info = _jitValueProfileInfo->getValueInfo(bcInfo, comp, kind, HashTableProfiler, true);
+         }
 
-      if (!info || info->getTotalFrequency() == 0)
+      if (!info || info->getTotalFrequency() == 0){
+         printf(", LinkedListProfiler"); fflush(stdout);
+         if(!info){ printf(", !info"); fflush(stdout); }
+         else if(info->getTotalFrequency() == 0) {printf(", info->getTotalFrequency() == 0"); fflush(stdout);}
          info = _jitValueProfileInfo->getValueInfo(bcInfo, comp, kind, LinkedListProfiler, true);
+         }
 
-      if (!info || info->getTotalFrequency() == 0)
+      if (!info || info->getTotalFrequency() == 0){
+         printf(", ArrayProfiler"); fflush(stdout);
+         if(!info){ printf(", !info"); fflush(stdout); }
+         else if(info->getTotalFrequency() == 0) {printf(", info->getTotalFrequency() == 0"); fflush(stdout);}
          info = _jitValueProfileInfo->getValueInfo(bcInfo, comp, kind, ArrayProfiler, true);
+         }
+      
+      if(!info){ printf(", noInternalInfo"); fflush(stdout); }
+      if(info){ printf(", internalInfo"); fflush(stdout); }
       }
 
    if (external && (!info || info->getTotalFrequency() == 0))
       {
+         printf(", external-1"); fflush(stdout);
       TR_ExternalValueProfileInfo *iVPInfo = comp->fej9()->getValueProfileInfoFromIProfiler(bcInfo, comp);
-      if (iVPInfo)
+      if (iVPInfo){
+         printf(", external-2"); fflush(stdout);
          info = iVPInfo->getValueInfo(bcInfo, comp);
+         }
       }
+
+   if(!info){ printf(", noInfo"); fflush(stdout); }
+   if(info){ printf(", info"); fflush(stdout); }
+
    return info;
    }
 
@@ -1448,8 +1477,10 @@ TR_ValueProfileInfo::getValueInfo(TR_ByteCodeInfo &bcInfo, TR::Compilation *comp
    {
    TR_AbstractProfilerInfo *info = getProfilerInfo(bcInfo, comp, kind, source, fuzz);
 
-   if (!info)
+   if (!info){
+      printf(", !getProfilerInfo"); fflush(stdout);
       return NULL;
+      }
 
    TR_ASSERT(kind == info->getKind() && source == info->getSource(), "Profiler with invalid kind or source returned");
    TR_AbstractInfo *valueInfo = info->getAbstractInfo(optRegion ? *optRegion : comp->trMemory()->currentStackRegion());
@@ -1477,13 +1508,16 @@ TR_ValueProfileInfo::getProfilerInfo(TR_ByteCodeInfo &bcInfo, TR::Compilation *c
    // All other sources compare the current compilation call sites with the stashed one
    for (TR_AbstractProfilerInfo *valueInfo = _values[source]; valueInfo; valueInfo = valueInfo->getNext())
       {
-      if (valueInfo->getKind() == kind && _callSiteInfo->hasSameBytecodeInfo(valueInfo->getByteCodeInfo(), bcInfo, comp))
+      if (valueInfo->getKind() == kind && _callSiteInfo->hasSameBytecodeInfo(valueInfo->getByteCodeInfo(), bcInfo, comp)){
+         printf(", valueInfoHere"); fflush(stdout);
          return valueInfo;
+         }
       }
 
    // If this TR_ValueProfileInfo is from a prior compile, attempt to fuzzy match the BCI
    if (fuzz)
       {
+      printf(", fuzz"); fflush(stdout);
       TR_AbstractProfilerInfo *bestMatchedValueInfo = NULL;
       int32_t maxMatchedCount = 0;
       int32_t matchCount = 0;
