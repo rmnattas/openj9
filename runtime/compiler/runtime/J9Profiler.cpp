@@ -396,7 +396,7 @@ void TR_ValueProfiler::modifyTrees()
          {
          TR::Node *arrayCopyLen = firstChild->getChild(firstChild->getNumChildren()-1);
          if (!arrayCopyLen->getOpCode().isLoadConst() &&
-             !arrayCopyLen->getByteCodeInfo().doNotProfile() &&
+             //!arrayCopyLen->getByteCodeInfo().doNotProfile() &&
              !(arrayCopyLen->getOpCode().isCallIndirect() &&
                !arrayCopyLen->isTheVirtualCallNodeForAGuardedInlinedCall()))
              {
