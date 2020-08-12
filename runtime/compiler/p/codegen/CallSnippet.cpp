@@ -725,24 +725,24 @@ uint8_t *TR::PPCInterfaceCallSnippet::emitSnippetBody()
             #endif
             )
             {
-            // If the high nibble is 0 and the next nibble's high bit is clear, change the first instruction to a nop and the third to a li
+            // If the high nibble is 0 and the next nibble's high bit is clear, change the first instruction to a nop and the second to a li
             // Next nibble's high bit needs to be clear in order to use li (because li will sign extend the immediate)
             if ((addrValue >> 48) == 0 && ((addrValue >> 32) & 0x8000) == 0)
                {
                *patchAddr |= addrValue & 0x0000ffff;
                addrValue = cg()->hiValue(addrValue);
-               uint32_t ori = *(patchAddr-2);
+               uint32_t ori = *(patchAddr-3);
                uint32_t li = TR::InstOpCode::getOpCodeBinaryEncoding(TR::InstOpCode::li) | (ori & 0x03e00000);
-               *(patchAddr-2) = li | ((addrValue>>16) & 0x0000ffff);
-               *(patchAddr-3) |= addrValue & 0x0000ffff;
+               *(patchAddr-2) |= addrValue & 0x0000ffff;
+               *(patchAddr-3) = li | ((addrValue>>16) & 0x0000ffff);
                *(patchAddr-4) = TR::InstOpCode::getOpCodeBinaryEncoding(TR::InstOpCode::nop);
                }
             else
                {
                *patchAddr |= addrValue & 0x0000ffff;
                addrValue = cg()->hiValue(addrValue);
-               *(patchAddr-2) |= (addrValue>>16) & 0x0000ffff;
-               *(patchAddr-3) |= addrValue & 0x0000ffff;
+               *(patchAddr-2) |= addrValue & 0x0000ffff;
+               *(patchAddr-3) |= (addrValue>>16) & 0x0000ffff;
                *(patchAddr-4) |= (addrValue>>32) & 0x0000ffff;
                }
             }

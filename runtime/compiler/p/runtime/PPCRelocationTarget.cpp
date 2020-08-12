@@ -233,8 +233,8 @@ TR_PPC64RelocationTarget::storeAddressSequence(uint8_t *address, uint8_t *reloLo
       case 4:
          {
          value1 = ((highValue>>32) & 0xffff);
-         value2 = (highValue & 0xffff);
-         value3 = ((highValue>>16) & 0xffff);
+         value2 = ((highValue>>16) & 0xffff);
+         value3 = (highValue & 0xffff);
          value4 = (value & 0xffff);
          patchAddr1 = (uint16_t *)&patchAddr[0];
          patchAddr2 = (uint16_t *)&patchAddr[1];
@@ -246,8 +246,8 @@ TR_PPC64RelocationTarget::storeAddressSequence(uint8_t *address, uint8_t *reloLo
       case 6:
          {
          value1 = ((highValue>>32) & 0xffff);
-         value2 = (highValue & 0xffff);
-         value3 = ((highValue>>16) & 0xffff);
+         value2 = ((highValue>>16) & 0xffff);
+         value3 = (highValue & 0xffff);
          value4 = (value & 0xffff);
          patchAddr1 = (uint16_t *)&patchAddr[0];
          patchAddr2 = (uint16_t *)&patchAddr[1];
