@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2020 IBM Corp. and others
+ * Copyright (c) 2000, 2021 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -74,6 +74,12 @@ class OMR_EXTENSIBLE TreeEvaluator: public J9::TreeEvaluator
    static TR::Register *conditionalHelperEvaluator(TR::Node *node, TR::CodeGenerator *cg);
    static TR::Register *flushEvaluator(TR::Node *node, TR::CodeGenerator *cg);
    static TR::Register *directCallEvaluator(TR::Node *node, TR::CodeGenerator *cg);
+
+   static TR::Register *checkcastinstanceofEvaluator(TR::Node *node, TR::CodeGenerator *cg);
+   static TR::Register *genCheckCastOrInstanceOfForDynamicClass(TR::Node* node, TR::CodeGenerator* cg, bool isCheckCast, TR::Node* ifInstanceOfNode);
+   static TR::Register *genCheckCastOrInstanceOfForInterface(TR::Node* node, TR_OpaqueClassBlock* clazz, TR::CodeGenerator* cg, bool isCheckCast, TR::Node* ifInstanceOfNode);
+   static TR::Register *genCheckCastOrInstanceOfForClass(TR::Node* node, TR_OpaqueClassBlock* clazz, TR::CodeGenerator* cg, bool isCheckCast, TR::Node* ifInstanceOfNode);
+   static TR::Register *genCheckCastOrInstanceOfForHelperCall(TR::Node* node, TR::CodeGenerator* cg, bool isCheckCast, TR::Node* ifInstanceOfNode);
 
    static TR::Register *VMcheckcastEvaluator2(TR::Node *node, TR::CodeGenerator *cg);
    static TR::Register *VMcheckcastEvaluator(TR::Node *node, TR::CodeGenerator *cg);
