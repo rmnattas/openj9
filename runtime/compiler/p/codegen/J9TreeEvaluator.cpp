@@ -1878,17 +1878,17 @@ TR::Register *J9::Power::TreeEvaluator::asynccheckEvaluator(TR::Node *node, TR::
 
 TR::Register *J9::Power::TreeEvaluator::instanceofEvaluator(TR::Node *node, TR::CodeGenerator *cg)
    {
-   return VMinstanceOfEvaluator(node, cg);
+   return checkcastinstanceofEvaluator(node, cg); 
    }
 
 TR::Register *J9::Power::TreeEvaluator::checkcastEvaluator(TR::Node *node, TR::CodeGenerator *cg)
    {
-   return TR::TreeEvaluator::VMcheckcastEvaluator(node, cg);
+   return checkcastinstanceofEvaluator(node, cg);
    }
 
 TR::Register *J9::Power::TreeEvaluator::checkcastAndNULLCHKEvaluator(TR::Node *node, TR::CodeGenerator *cg)
    {
-   return checkcastEvaluator(node, cg);
+   return checkcastinstanceofEvaluator(node, cg);
    }
 
 TR::Register *J9::Power::TreeEvaluator::newObjectEvaluator(TR::Node *node, TR::CodeGenerator *cg)
@@ -3746,6 +3746,877 @@ void genInstanceOfOrCheckCastHelperCall(TR::Node *node, TR::Register *objectReg,
 
    TR::Register *nodeRegs[3] = {objectReg, castClassReg, resultReg};
    deps->stopUsingDepRegs(cg, 3, nodeRegs);
+   }
+
+TR::Register *J9::Power::TreeEvaluator::checkcastinstanceofEvaluator(TR::Node *node, TR::CodeGenerator *cg)
+   {
+   TR::Compilation *comp = cg->comp();
+
+   bool isCheckCast = false;
+   TR::Node *ifInstanceOfNode = NULL; // Holds the if-node in the case of ifInstanceOf
+   switch (node->getOpCodeValue())
+      {
+      case TR::checkcast:
+      case TR::checkcastAndNULLCHK:
+         isCheckCast = true;
+         break;
+      case TR::instanceof:
+      // case TR::icall: // TR_checkAssignable
+         break;
+      default:
+         if (node->getFirstChild()->getOpCodeValue() == TR::instanceof)
+            {
+            ifInstanceOfNode = node;
+            node = node->getFirstChild();
+            }
+         else
+            TR_ASSERT(false, "Incorrect Op Code %d in checkcastinstanceofEvaluator.", node->getOpCodeValue());
+         break;
+      }
+
+   auto clazz = TR::TreeEvaluator::getCastClassAddress(node->getChild(1));
+   bool castClassUnresolved = node->getChild(1)->getSymbolReference()->isUnresolved(); // TODO
+   if (!clazz && !castClassUnresolved && ( (isCheckCast && !comp->getOption(TR_DisableInlineCheckCast)) || (!isCheckCast && !comp->getOption(TR_DisableInlineInstanceOf)) ) && 
+         (!comp->compileRelocatableCode() || comp->getOption(TR_UseSymbolValidationManager)) /* && !comp->getOption(TR_OptimizeForSpace)*/ ) // TODO, enable for relocatableCode
+      {
+      if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting for DynamicClass\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+      return genCheckCastOrInstanceOfForDynamicClass(node, cg, isCheckCast, ifInstanceOfNode);
+      }
+   /*else if (clazz &&
+       !TR::Compiler->cls.isClassArray(comp, clazz) && // not yet optimized
+       (!comp->compileRelocatableCode() || comp->getOption(TR_UseSymbolValidationManager)) &&
+       !comp->getOption(TR_DisableInlineCheckCast)  &&
+       !comp->getOption(TR_DisableInlineInstanceOf))
+      {
+      cg->evaluate(node->getChild(0));
+      if (TR::Compiler->cls.isInterfaceClass(comp, clazz))
+         {
+         if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting for Interface\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+         return genCheckCastOrInstanceOfForInterface(node, clazz, cg, isCheckCast, ifInstanceOfNode);
+         }
+      else
+         {
+         if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting for Class\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+         return genCheckCastOrInstanceOfForClass(node, clazz, cg, isCheckCast, ifInstanceOfNode);
+         }
+      }*/
+   else
+      {
+      if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting HelperCall\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+      return genCheckCastOrInstanceOfForHelperCall(node, cg, isCheckCast, ifInstanceOfNode); // TODO rename method
+      }
+   }
+
+
+/**   \brief Handles checkCast, instanceOf, and ifInstanceOf for dynamic castClass
+ **   \param node
+ **      The checkcast or instanceof node
+ **   \param isCheckCast
+ **      True when the case is checkCast, false for instanceOf and ifInstanceOf
+ **   \param ifInstanceOfNode
+ **      In the case of ifInstanceOf this holds the if-node (parent of instanceOf), null otherwise.
+ **/
+TR::Register *J9::Power::TreeEvaluator::genCheckCastOrInstanceOfForDynamicClass(TR::Node* node, TR::CodeGenerator* cg, bool isCheckCast, TR::Node* ifInstanceOfNode)
+   {
+   
+   // Generated Layout
+   // startLabel:
+   // <nullCheck> // if needed
+   // get objectClass
+   // if(isArray(castClass)) b callHelper
+   // if(!isInterface(castClass)) b testClassLabel
+   // <iTable-loop>
+   // testClassLabel: <testClass&Super>
+   // res0Label: <Not-match sequence>
+   // doneLabel:
+   // OOLDoneLabel: // Contain only the dep needed for the OOL section
+   // ---
+   // <OOL callHelper>
+   // <OOL helperReturn> // incase of ifInstanceOf
+
+
+   TR::Compilation *comp = cg->comp();
+   TR::RegisterDependencyConditions *deps;
+   TR::Node *depNode;
+   int32_t numDep;
+   // int32_t depIndex = 0;
+   bool initialResult = true; // Changing initalResult from true requires an algorithm change 
+   bool branchIfMatch; // For ifInstanceOf, when class found does it branch or fallThru 
+
+   TR::LabelSymbol *startLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol *testClassLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol *iTableLoopLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol *helperCallLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol *helperReturnLabel; // For ifInstanceOf to branch
+   TR::LabelSymbol *res1Label; // Match
+   TR::LabelSymbol *res0Label; // Not-match
+   TR::LabelSymbol *branchLabel;
+   TR::LabelSymbol *doneLabel = generateLabelSymbol(cg);
+   startLabel->setStartInternalControlFlow();
+   doneLabel->setEndInternalControlFlow();
+   TR::Instruction *gcPoint;
+
+   TR::Node       *objectNode = node->getFirstChild();
+   TR::Register   *objectReg = cg->evaluate(objectNode);
+   TR::Register   *objClassReg = cg->allocateRegister();
+   TR::Node       *castClassNode = node->getSecondChild();
+   TR::Register   *castClassReg = cg->evaluate(castClassNode);
+   TR::Register   *temp1Reg = cg->allocateRegister();
+   TR::Register   *temp2Reg = cg->allocateRegister();
+   TR::Register   *resultReg;
+   if (!isCheckCast)
+      resultReg = cg->allocateRegister();
+   TR::Register   *crReg = cg->allocateRegister(TR_CCR);
+   
+   bool isCheckCastAndNullCheck = (isCheckCast && (node->getOpCodeValue() == TR::checkcastAndNULLCHK));
+   bool mayBeNull = !node->isReferenceNonNull() && !objectNode->isNonNull();
+   bool needResult = (!isCheckCast && (!ifInstanceOfNode || (ifInstanceOfNode && node->getReferenceCount() > 1)));
+   bool objInDep = false;
+   bool castClassInDep = false;
+
+   if (ifInstanceOfNode && ifInstanceOfNode->getNumChildren() == 3)
+      {
+      depNode = ifInstanceOfNode->getChild(2);
+      numDep = depNode->getNumChildren();
+
+      if (numberOfRegisterCandidate(cg, depNode, TR_GPR) + 6 > cg->getMaximumNumberOfGPRsAllowedAcrossEdge(node))
+         return ((TR::Register *) 1);
+
+      int32_t i1;
+      const TR::PPCLinkageProperties& properties = cg->getLinkage()->getProperties();
+      for (i1 = 0; i1 < depNode->getNumChildren(); i1++)
+         {
+         TR::Node *childNode = depNode->getChild(i1);
+         int32_t regIndex = cg->getGlobalRegister(childNode->getGlobalRegisterNumber());
+
+         int32_t validHighRegNum = TR::TreeEvaluator::getHighGlobalRegisterNumberIfAny(childNode, cg);
+
+         // if (needsHelperCall)
+            {
+            int32_t highIndex;
+
+            if (validHighRegNum != -1)
+               highIndex = cg->getGlobalRegister(validHighRegNum);
+
+            if (!properties.getPreserved((TR::RealRegister::RegNum) regIndex)
+                  || (validHighRegNum != -1 && !properties.getPreserved((TR::RealRegister::RegNum) highIndex)))
+               return ((TR::Register *) 1);
+            }
+         // else
+            {
+            if (childNode->getOpCodeValue() == TR::PassThrough)
+               childNode = childNode->getFirstChild();
+            if ((childNode == objectNode || childNode == castClassNode) && regIndex == TR::RealRegister::gr0)
+               return ((TR::Register *) 1);
+            }
+         }
+      
+      // Check if object or castClass are already in dependency
+      for (i1 = 0; i1 < numDep; i1++)
+         {
+         TR::Node *grNode = depNode->getChild(i1);
+         if (grNode->getOpCodeValue() == TR::PassThrough)
+            grNode = grNode->getFirstChild();
+         if (grNode == objectNode)
+            objInDep = true;
+         if (grNode == castClassNode)
+            castClassInDep = true;
+         }
+         
+      cg->evaluate(depNode);
+      deps = generateRegisterDependencyConditions(cg, depNode, 7);
+      cg->decReferenceCount(depNode);
+
+      // depIndex = numberOfRegisterCandidate(cg, depNode, TR_GPR) + numberOfRegisterCandidate(cg, depNode, TR_FPR) +
+      //            numberOfRegisterCandidate(cg, depNode, TR_CCR) + numberOfRegisterCandidate(cg, depNode, TR_VRF) +
+	   //            numberOfRegisterCandidate(cg, depNode, TR_VSX_SCALAR) + numberOfRegisterCandidate(cg, depNode, TR_VSX_VECTOR);
+      }
+   else
+      deps = new (cg->trHeapMemory()) TR::RegisterDependencyConditions(0, 7, cg->trMemory());
+
+
+   if (!objInDep)
+      deps->addPostCondition(objectReg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   if (!castClassInDep)
+      deps->addPostCondition(castClassReg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   deps->addPostCondition(objClassReg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   deps->addPostCondition(temp1Reg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   deps->addPostCondition(temp2Reg, TR::RealRegister::NoReg);
+   if (!isCheckCast)
+      deps->addPostCondition(resultReg, TR::RealRegister::NoReg);
+   deps->addPostCondition(crReg, TR::RealRegister::cr0);
+
+
+   // Incase of ifinstanceof, set the result labels to the branch and fallThru labels.
+   if (ifInstanceOfNode)
+      {
+      helperReturnLabel = generateLabelSymbol(cg);
+      branchLabel = ifInstanceOfNode->getBranchDestination()->getNode()->getLabel();
+      TR::ILOpCodes ifOpCode = ifInstanceOfNode->getOpCodeValue();
+      int32_t value = ifInstanceOfNode->getSecondChild()->getInt();
+      // Set res0 and res1 labels depending on the if-condition 
+      if ((ifOpCode == TR::ificmpeq && value == 1) || (ifOpCode != TR::ificmpeq && value == 0))
+         {
+         res0Label = (!needResult ? doneLabel : generateLabelSymbol(cg));
+         res1Label = branchLabel;
+         branchIfMatch = true;
+         }
+      else
+         {
+         res0Label = (!needResult ? branchLabel : generateLabelSymbol(cg));
+         res1Label = doneLabel;
+         branchIfMatch = false;
+         }
+      }
+   else // Incase of checkcast and instance of, fallThru/initialResult when True or res0Label(exception/setFalse) when False
+      {
+         res0Label = generateLabelSymbol(cg);
+         res1Label = doneLabel;
+      }
+
+   generateLabelInstruction(cg, TR::InstOpCode::label, node, startLabel);
+   if(needResult)
+      generateTrg1ImmInstruction(cg, TR::InstOpCode::li, node, resultReg, static_cast<int32_t>(initialResult));
+
+   // Generating the NullTest
+   if (isCheckCastAndNullCheck || mayBeNull)
+      {
+      if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting NullTest\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+      if (isCheckCastAndNullCheck)
+         {
+         TR::Node *nullChkInfo = comp->findNullChkInfo(node);
+         gcPoint = generateNullTestInstructions(cg, objectReg, nullChkInfo, !cg->getHasResumableTrapHandler());
+         gcPoint->PPCNeedsGCMap(0x0);
+         }
+      else
+         {
+         generateTrg1Src1ImmInstruction(cg,TR::InstOpCode::Op_cmpli, node, crReg, objectReg, NULLVALUE);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res0Label, crReg);
+         }
+      }
+   
+   // Get objClass
+   generateLoadJ9Class(node, objClassReg, objectReg, cg);
+   
+   // Check if castClass is an Array or Interface
+   if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting Array and Interface Tests\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+   generateTrg1MemInstruction(cg, TR::InstOpCode::Op_load, node, temp1Reg, TR::MemoryReference::createWithDisplacement(cg, castClassReg, offsetof(J9Class, romClass), TR::Compiler->om.sizeofReferenceAddress()));
+   generateTrg1MemInstruction(cg, TR::InstOpCode::lwz, node, temp1Reg, TR::MemoryReference::createWithDisplacement(cg, temp1Reg, offsetof(J9ROMClass, modifiers), 4));
+   // Checking the values for J9AccClassArray and J9AccInterface, if the values changed a change may be needed to accommodate the instruction 16bit imm limit
+   TR_ASSERT(J9AccClassArray == (1 << 16) && J9AccInterface == (1 << 9), "J9AccClassArray or J9AccInterface changed value");
+   generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::andis_r, node, temp2Reg, temp1Reg, crReg, J9AccClassArray >> 16);
+   generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, helperCallLabel, crReg);
+   generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::andi_r, node, temp2Reg, temp1Reg, crReg, J9AccInterface);
+   generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, testClassLabel, crReg);
+
+   // iTable loop to find a match interface
+   if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting iTableloop\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+   generateTrg1MemInstruction(cg, TR::InstOpCode::Op_load, node, temp1Reg, 
+      TR::MemoryReference::createWithDisplacement(cg, objClassReg, offsetof(J9Class, iTable), TR::Compiler->om.sizeofReferenceAddress()));
+   generateLabelInstruction(cg, TR::InstOpCode::label, node, iTableLoopLabel);
+   generateTrg1Src1ImmInstruction(cg,TR::InstOpCode::Op_cmpli, node, crReg, temp1Reg, NULLVALUE);
+   generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res0Label, crReg);
+   generateTrg1MemInstruction(cg, TR::InstOpCode::Op_load, node, temp2Reg, 
+      TR::MemoryReference::createWithDisplacement(cg, temp1Reg, offsetof(J9ITable, interfaceClass), TR::Compiler->om.sizeofReferenceAddress()));
+   generateTrg1Src2Instruction(cg,TR::InstOpCode::Op_cmpl, node, crReg, temp2Reg, castClassReg);
+   generateTrg1MemInstruction(cg, TR::InstOpCode::Op_load, node, temp1Reg, 
+      TR::MemoryReference::createWithDisplacement(cg, temp1Reg, offsetof(J9ITable, next), TR::Compiler->om.sizeofReferenceAddress()));
+   generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, iTableLoopLabel, crReg);
+   generateLabelInstruction(cg, TR::InstOpCode::b, node, res1Label);
+
+   // Test class match
+   if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting ClassTest\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+   generateLabelInstruction(cg, TR::InstOpCode::label, node, testClassLabel);
+   generateTrg1Src2Instruction(cg,TR::InstOpCode::Op_cmpl, node, crReg, objClassReg, castClassReg);
+   generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+   // Test isSuper
+   generateTrg1MemInstruction(cg,TR::InstOpCode::Op_load, node, temp2Reg,
+      TR::MemoryReference::createWithDisplacement(cg, castClassReg, offsetof(J9Class, classDepthAndFlags), TR::Compiler->om.sizeofReferenceAddress()));
+   generateTrg1Src1Imm2Instruction(cg, TR::InstOpCode::rlwinm, node, temp2Reg, temp2Reg, 0, J9AccClassDepthMask);
+   genTestIsSuper(node, objClassReg, castClassReg, crReg, temp1Reg, temp2Reg, -1, res0Label, cg->getAppendInstruction(), cg, true);
+   if (ifInstanceOfNode)
+      if(branchIfMatch)
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+         // bne: fallThru to doneLabel or res0Label (if needResult)
+      else
+         // generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, res0Label, crReg);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+         // bne: fallThru to res0Label
+   else // checkcast or instanceof
+      generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+      // bne: fallThru to res0Label
+   
+   // Not-match sequence
+   if (needResult || isCheckCast)
+      {
+      generateLabelInstruction(cg, TR::InstOpCode::label, node, res0Label);
+      if (isCheckCast)
+         // TODO TR::TreeEvaluator::generateHelperBranchAndLinkInstruction(TR_throwClassCastException, node, conditions, cg);
+         generateLabelInstruction(cg, TR::InstOpCode::b, node, helperCallLabel);
+      else
+         {
+         generateTrg1ImmInstruction(cg, TR::InstOpCode::li, node, resultReg, static_cast<int32_t>(!initialResult));
+         if (ifInstanceOfNode)
+            if(!branchIfMatch)
+               // generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, res0Label, crReg);
+               generateLabelInstruction(cg, TR::InstOpCode::b, node, branchLabel);
+            // else
+               // generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+               // generateLabelInstruction(cg, TR::InstOpCode::b, node, helperCallLabel);
+               // fallThru
+         }
+      }
+
+   generateDepLabelInstruction(cg, TR::InstOpCode::label, node, doneLabel, deps);
+
+   // OOL HelperCall
+   if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting OOL HelperCall\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+   TR_PPCOutOfLineCodeSection *helperCallOOL = new (cg->trHeapMemory()) TR_PPCOutOfLineCodeSection(helperCallLabel, doneLabel, cg);
+   cg->getPPCOutOfLineCodeSectionList().push_front(helperCallOOL);
+   helperCallOOL->swapInstructionListsWithCompilation(); // OOL begin.
+      {
+      generateDepLabelInstruction(cg, TR::InstOpCode::label, node, helperCallLabel, deps);
+
+      TR::ILOpCodes opCode = node->getOpCodeValue();
+      TR::Register *returnReg;
+      TR::Node::recreate(node, isCheckCast ? TR::call : TR::icall);
+      returnReg = directCallEvaluator(node, cg);
+      TR::Node::recreate(node, opCode);
+      if (needResult)
+         generateTrg1Src1Instruction(cg, TR::InstOpCode::mr, node, resultReg, returnReg); // Can opt
+
+      // helperReturnOOL: When returning from helper, ifInstanceOf may need to branch
+      if (ifInstanceOfNode)
+         {
+         // generateDepLabelInstruction(cg, TR::InstOpCode::label, node, helperReturnLabel, deps);
+         generateLabelInstruction(cg, TR::InstOpCode::label, node, helperReturnLabel);
+         generateTrg1Src1ImmInstruction(cg,TR::InstOpCode::Op_cmpli, node, crReg, returnReg, 1);
+         if(branchIfMatch)
+            generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+         else
+            generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, res0Label, crReg);
+         }
+      generateDepLabelInstruction(cg, TR::InstOpCode::b, node, doneLabel, deps);
+      }
+   helperCallOOL->swapInstructionListsWithCompilation(); // OOL end.
+
+   cg->stopUsingRegister(objClassReg);
+   cg->stopUsingRegister(temp1Reg);
+   cg->stopUsingRegister(temp2Reg);
+   cg->stopUsingRegister(crReg);
+   if (!isCheckCast)
+      {
+      if (needResult)
+         node->setRegister(resultReg);
+      else
+         cg->stopUsingRegister(resultReg);
+      }
+   
+   // The object and castClass nodes are decremented  during the creation of the helper call
+   if (ifInstanceOfNode)
+      {
+      cg->decReferenceCount(ifInstanceOfNode->getFirstChild()); // instanceOf node
+      cg->decReferenceCount(ifInstanceOfNode->getSecondChild()); // valueNode
+      }
+   return (!ifInstanceOfNode ? node->getRegister() : NULL); // ifInstanceOfNode returns NULL when successful
+   }
+
+TR::Register *J9::Power::TreeEvaluator::genCheckCastOrInstanceOfForInterface(TR::Node* node, TR_OpaqueClassBlock* clazz, TR::CodeGenerator* cg, bool isCheckCast, TR::Node* ifInstanceOfNode)
+   {
+   TR::Compilation *comp = cg->comp();
+   TR::RegisterDependencyConditions *deps;
+   TR::Node *depNode;
+   int32_t numDep;
+   // int32_t depIndex = 0;
+   bool initialResult = true; // Changing initalResult from true requires an algorithm change 
+   bool branchIfMatch; // For ifInstanceOf, when class found does it branch or fallThru 
+
+   TR::LabelSymbol *startLabel = generateLabelSymbol(cg);
+   // TR::LabelSymbol *testClassLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol *iTableLoopLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol *helperCallLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol *helperReturnLabel; // For ifInstanceOf to branch
+   TR::LabelSymbol *res1Label; // Match
+   TR::LabelSymbol *res0Label; // Not-match
+   TR::LabelSymbol *branchLabel;
+   TR::LabelSymbol *doneLabel = generateLabelSymbol(cg);
+   startLabel->setStartInternalControlFlow();
+   doneLabel->setEndInternalControlFlow();
+   TR::Instruction *gcPoint;
+
+   TR::Node       *objectNode = node->getFirstChild();
+   TR::Register   *objectReg = cg->evaluate(objectNode);
+   TR::Register   *objClassReg = cg->allocateRegister();
+   TR::Node       *castClassNode = node->getSecondChild();
+   TR::Register   *castClassReg = cg->evaluate(castClassNode);
+   TR::Register   *temp1Reg = cg->allocateRegister();
+   TR::Register   *temp2Reg = cg->allocateRegister(); // Can be a reusable reg
+   TR::Register   *resultReg;
+   if (!isCheckCast)
+      resultReg = cg->allocateRegister();
+   TR::Register   *crReg = cg->allocateRegister(TR_CCR);
+
+   bool isCheckCastAndNullCheck = (isCheckCast && (node->getOpCodeValue() == TR::checkcastAndNULLCHK));
+   bool mayBeNull = !node->isReferenceNonNull() && !objectNode->isNonNull();
+   bool needResult = (!isCheckCast && (!ifInstanceOfNode || (ifInstanceOfNode && node->getReferenceCount() > 1)));
+   bool objInDep = false;
+   bool castClassInDep = false;
+
+   // TODO ifInstanceOf dep
+   deps = new (cg->trHeapMemory()) TR::RegisterDependencyConditions(0, 7, cg->trMemory());
+
+   // TODO clean exclude 0
+   // if (!objInDep)
+      deps->addPostCondition(objectReg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   // if (!castClassInDep)
+      deps->addPostCondition(castClassReg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   deps->addPostCondition(objClassReg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   deps->addPostCondition(temp1Reg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   deps->addPostCondition(temp2Reg, TR::RealRegister::NoReg);
+   if (!isCheckCast)
+      deps->addPostCondition(resultReg, TR::RealRegister::NoReg);
+   deps->addPostCondition(crReg, TR::RealRegister::cr0);
+
+   // TODO set labels for ifInstanceOf
+   // else // Incase of checkcast and instance of, fallThru/initialResult when True or res0Label(exception/setFalse) when False
+   {
+      res0Label = generateLabelSymbol(cg);
+      res1Label = doneLabel;
+   }
+
+   generateLabelInstruction(cg, TR::InstOpCode::label, node, startLabel);
+   if(needResult)
+      generateTrg1ImmInstruction(cg, TR::InstOpCode::li, node, resultReg, static_cast<int32_t>(initialResult));
+
+   // Generating the NullTest
+   if (isCheckCastAndNullCheck || mayBeNull)
+      {
+      if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting NullTest\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+      if (isCheckCastAndNullCheck)
+         {
+         TR::Node *nullChkInfo = comp->findNullChkInfo(node);
+         gcPoint = generateNullTestInstructions(cg, objectReg, nullChkInfo, !cg->getHasResumableTrapHandler());
+         gcPoint->PPCNeedsGCMap(0x0);
+         }
+      else
+         {
+         generateTrg1Src1ImmInstruction(cg,TR::InstOpCode::Op_cmpli, node, crReg, objectReg, NULLVALUE);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res0Label, crReg);
+         }
+      }
+
+
+   // Get objClass
+   generateLoadJ9Class(node, objClassReg, objectReg, cg);
+
+   // iTable loop to find a match interface
+   if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting iTableloop\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+   generateTrg1MemInstruction(cg, TR::InstOpCode::Op_load, node, temp1Reg, 
+      TR::MemoryReference::createWithDisplacement(cg, objClassReg, offsetof(J9Class, iTable), TR::Compiler->om.sizeofReferenceAddress()));
+   generateLabelInstruction(cg, TR::InstOpCode::label, node, iTableLoopLabel);
+   generateTrg1Src1ImmInstruction(cg,TR::InstOpCode::Op_cmpli, node, crReg, temp1Reg, NULLVALUE);
+   generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res0Label, crReg);
+   generateTrg1MemInstruction(cg, TR::InstOpCode::Op_load, node, temp2Reg, 
+      TR::MemoryReference::createWithDisplacement(cg, temp1Reg, offsetof(J9ITable, interfaceClass), TR::Compiler->om.sizeofReferenceAddress()));
+   generateTrg1Src2Instruction(cg,TR::InstOpCode::Op_cmpl, node, crReg, temp2Reg, castClassReg);
+   generateTrg1MemInstruction(cg, TR::InstOpCode::Op_load, node, temp1Reg, 
+      TR::MemoryReference::createWithDisplacement(cg, temp1Reg, offsetof(J9ITable, next), TR::Compiler->om.sizeofReferenceAddress()));
+   generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, iTableLoopLabel, crReg);
+   generateLabelInstruction(cg, TR::InstOpCode::b, node, res1Label);
+
+   // Not-match sequence
+   if (needResult || isCheckCast)
+      {
+      generateLabelInstruction(cg, TR::InstOpCode::label, node, res0Label);
+      if (isCheckCast)
+         // TODO TR::TreeEvaluator::generateHelperBranchAndLinkInstruction(TR_throwClassCastException, node, conditions, cg);
+         generateLabelInstruction(cg, TR::InstOpCode::b, node, helperCallLabel);
+      else
+         {
+         generateTrg1ImmInstruction(cg, TR::InstOpCode::li, node, resultReg, static_cast<int32_t>(!initialResult));
+         if (ifInstanceOfNode)
+            if(!branchIfMatch)
+               // generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, res0Label, crReg);
+               generateLabelInstruction(cg, TR::InstOpCode::b, node, branchLabel);
+            // else
+               // generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+               // generateLabelInstruction(cg, TR::InstOpCode::b, node, helperCallLabel);
+               // fallThru
+         }
+      }
+
+   generateDepLabelInstruction(cg, TR::InstOpCode::label, node, doneLabel, deps);
+    
+   // OOL HelperCall
+   if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting OOL HelperCall\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+   TR_PPCOutOfLineCodeSection *helperCallOOL = new (cg->trHeapMemory()) TR_PPCOutOfLineCodeSection(helperCallLabel, doneLabel, cg);
+   cg->getPPCOutOfLineCodeSectionList().push_front(helperCallOOL);
+   // TR::RegisterDependencyConditions *OOLDeps = new (cg->trHeapMemory()) TR::RegisterDependencyConditions(0, 1, cg->trMemory());
+   // OOLDeps->addPostCondition(resultReg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   helperCallOOL->swapInstructionListsWithCompilation(); // OOL begin.
+      {
+      generateDepLabelInstruction(cg, TR::InstOpCode::label, node, helperCallLabel, deps);
+
+      TR::ILOpCodes opCode = node->getOpCodeValue();
+      TR::Register *returnReg;
+      TR::Node::recreate(node, isCheckCast ? TR::call : TR::icall);
+      returnReg = directCallEvaluator(node, cg);
+      TR::Node::recreate(node, opCode);
+      if (needResult)
+         generateTrg1Src1Instruction(cg, TR::InstOpCode::mr, node, resultReg, returnReg); // Can opt
+
+      // helperReturnOOL: When returning from helper, ifInstanceOf may need to branch
+      if (ifInstanceOfNode)
+         {
+         // generateDepLabelInstruction(cg, TR::InstOpCode::label, node, helperReturnLabel, deps);
+         generateLabelInstruction(cg, TR::InstOpCode::label, node, helperReturnLabel);
+         generateTrg1Src1ImmInstruction(cg,TR::InstOpCode::Op_cmpli, node, crReg, returnReg, 1);
+         if(branchIfMatch)
+            generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+         else
+            generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, res0Label, crReg);
+         }
+      generateDepLabelInstruction(cg, TR::InstOpCode::b, node, doneLabel, deps);
+      }
+   helperCallOOL->swapInstructionListsWithCompilation(); // OOL end.
+
+   cg->stopUsingRegister(objClassReg);
+   cg->stopUsingRegister(temp1Reg);
+   cg->stopUsingRegister(temp2Reg);
+   cg->stopUsingRegister(crReg);
+   if (!isCheckCast)
+      {
+      if (needResult)
+         node->setRegister(resultReg);
+      else
+         cg->stopUsingRegister(resultReg);
+      }
+   
+   // The object and castClass nodes are decremented  during the creation of the helper call
+   if (ifInstanceOfNode)
+      {
+      cg->decReferenceCount(ifInstanceOfNode->getFirstChild()); // instanceOf node
+      cg->decReferenceCount(ifInstanceOfNode->getSecondChild()); // valueNode
+      }
+   return (!ifInstanceOfNode ? node->getRegister() : NULL); // ifInstanceOfNode returns NULL when successful
+   }
+
+TR::Register *J9::Power::TreeEvaluator::genCheckCastOrInstanceOfForClass(TR::Node* node, TR_OpaqueClassBlock* clazz, TR::CodeGenerator* cg, bool isCheckCast, TR::Node* ifInstanceOfNode)
+   {
+   TR::Compilation *comp = cg->comp();
+   TR::RegisterDependencyConditions *deps;
+   TR::Node *depNode;
+   int32_t numDep;
+   // int32_t depIndex = 0;
+   bool initialResult = true; // Changing initalResult from true requires an algorithm change 
+   bool branchIfMatch; // For ifInstanceOf, when class found does it branch or fallThru 
+
+   TR::LabelSymbol *startLabel = generateLabelSymbol(cg);
+   // TR::LabelSymbol *testClassLabel = generateLabelSymbol(cg);
+   // TR::LabelSymbol *iTableLoopLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol *helperCallLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol *helperReturnLabel; // For ifInstanceOf to branch
+   TR::LabelSymbol *res1Label; // Match
+   TR::LabelSymbol *res0Label; // Not-match
+   TR::LabelSymbol *branchLabel;
+   TR::LabelSymbol *doneLabel = generateLabelSymbol(cg);
+   startLabel->setStartInternalControlFlow();
+   doneLabel->setEndInternalControlFlow();
+   TR::Instruction *gcPoint;
+
+   TR::Node       *objectNode = node->getFirstChild();
+   TR::Register   *objectReg = cg->evaluate(objectNode);
+   TR::Register   *objClassReg = cg->allocateRegister();
+   TR::Node       *castClassNode = node->getSecondChild();
+   TR::Register   *castClassReg = cg->evaluate(castClassNode);
+   TR::Register   *temp1Reg = cg->allocateRegister();
+   TR::Register   *temp2Reg = cg->allocateRegister(); // Can be a reusable reg
+   TR::Register   *resultReg;
+   if (!isCheckCast)
+      resultReg = cg->allocateRegister();
+   TR::Register   *crReg = cg->allocateRegister(TR_CCR);
+
+   bool isCheckCastAndNullCheck = (isCheckCast && (node->getOpCodeValue() == TR::checkcastAndNULLCHK));
+   bool mayBeNull = !node->isReferenceNonNull() && !objectNode->isNonNull();
+   bool needResult = (!isCheckCast && (!ifInstanceOfNode || (ifInstanceOfNode && node->getReferenceCount() > 1)));
+   bool objInDep = false;
+   bool castClassInDep = false;
+
+   // TODO ifInstanceOf dep
+   deps = new (cg->trHeapMemory()) TR::RegisterDependencyConditions(0, 7, cg->trMemory());
+
+   // TODO clean exclude 0
+   // if (!objInDep)
+      deps->addPostCondition(objectReg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   // if (!castClassInDep)
+      deps->addPostCondition(castClassReg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   deps->addPostCondition(objClassReg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   deps->addPostCondition(temp1Reg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   deps->addPostCondition(temp2Reg, TR::RealRegister::NoReg);
+   if (!isCheckCast)
+      deps->addPostCondition(resultReg, TR::RealRegister::NoReg);
+   deps->addPostCondition(crReg, TR::RealRegister::cr0);
+
+   // TODO set labels for ifInstanceOf
+   // else // Incase of checkcast and instance of, fallThru/initialResult when True or res0Label(exception/setFalse) when False
+   {
+      res0Label = generateLabelSymbol(cg);
+      res1Label = doneLabel;
+   }
+
+   generateLabelInstruction(cg, TR::InstOpCode::label, node, startLabel);
+   if(needResult)
+      generateTrg1ImmInstruction(cg, TR::InstOpCode::li, node, resultReg, static_cast<int32_t>(initialResult));
+
+   // Generating the NullTest
+   if (isCheckCastAndNullCheck || mayBeNull)
+      {
+      if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting NullTest\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+      if (isCheckCastAndNullCheck)
+         {
+         TR::Node *nullChkInfo = comp->findNullChkInfo(node);
+         gcPoint = generateNullTestInstructions(cg, objectReg, nullChkInfo, !cg->getHasResumableTrapHandler());
+         gcPoint->PPCNeedsGCMap(0x0);
+         }
+      else
+         {
+         generateTrg1Src1ImmInstruction(cg,TR::InstOpCode::Op_cmpli, node, crReg, objectReg, NULLVALUE);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res0Label, crReg);
+         }
+      }
+
+
+   // Get objClass
+   generateLoadJ9Class(node, objClassReg, objectReg, cg);
+
+   // Test class match
+   if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting ClassTest\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+   // generateLabelInstruction(cg, TR::InstOpCode::label, node, testClassLabel);
+   generateTrg1Src2Instruction(cg,TR::InstOpCode::Op_cmpl, node, crReg, objClassReg, castClassReg);
+   generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+   // Test isSuper
+   generateTrg1MemInstruction(cg,TR::InstOpCode::Op_load, node, temp2Reg,
+      TR::MemoryReference::createWithDisplacement(cg, castClassReg, offsetof(J9Class, classDepthAndFlags), TR::Compiler->om.sizeofReferenceAddress()));
+   generateTrg1Src1Imm2Instruction(cg, TR::InstOpCode::rlwinm, node, temp2Reg, temp2Reg, 0, J9AccClassDepthMask);
+   genTestIsSuper(node, objClassReg, castClassReg, crReg, temp1Reg, temp2Reg, -1, res0Label, cg->getAppendInstruction(), cg, true);
+   if (ifInstanceOfNode)
+      if(branchIfMatch)
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+         // bne: fallThru to doneLabel or res0Label (if needResult)
+      else
+         // generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, res0Label, crReg);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+         // bne: fallThru to res0Label
+   else // checkcast or instanceof
+      generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+      // bne: fallThru to res0Label
+
+   // Not-match sequence
+   if (needResult || isCheckCast)
+      {
+      generateLabelInstruction(cg, TR::InstOpCode::label, node, res0Label);
+      if (isCheckCast)
+         // TODO TR::TreeEvaluator::generateHelperBranchAndLinkInstruction(TR_throwClassCastException, node, conditions, cg);
+         generateLabelInstruction(cg, TR::InstOpCode::b, node, helperCallLabel);
+      else
+         {
+         generateTrg1ImmInstruction(cg, TR::InstOpCode::li, node, resultReg, static_cast<int32_t>(!initialResult));
+         if (ifInstanceOfNode)
+            if(!branchIfMatch)
+               // generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, res0Label, crReg);
+               generateLabelInstruction(cg, TR::InstOpCode::b, node, branchLabel);
+            // else
+               // generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+               // generateLabelInstruction(cg, TR::InstOpCode::b, node, helperCallLabel);
+               // fallThru
+         }
+      }
+
+   generateDepLabelInstruction(cg, TR::InstOpCode::label, node, doneLabel, deps);
+    
+   // OOL HelperCall
+   if (comp->getOption(TR_TraceCG)) traceMsg(comp, "%s: Emitting OOL HelperCall\n", (ifInstanceOfNode ? "ifInstanceof" : node->getOpCode().getName()));
+   TR_PPCOutOfLineCodeSection *helperCallOOL = new (cg->trHeapMemory()) TR_PPCOutOfLineCodeSection(helperCallLabel, doneLabel, cg);
+   cg->getPPCOutOfLineCodeSectionList().push_front(helperCallOOL);
+   // TR::RegisterDependencyConditions *OOLDeps = new (cg->trHeapMemory()) TR::RegisterDependencyConditions(0, 1, cg->trMemory());
+   // OOLDeps->addPostCondition(resultReg, TR::RealRegister::NoReg, UsesDependentRegister | ExcludeGPR0InAssigner);
+   helperCallOOL->swapInstructionListsWithCompilation(); // OOL begin.
+      {
+      generateDepLabelInstruction(cg, TR::InstOpCode::label, node, helperCallLabel, deps);
+
+      TR::ILOpCodes opCode = node->getOpCodeValue();
+      TR::Register *returnReg;
+      TR::Node::recreate(node, isCheckCast ? TR::call : TR::icall);
+      returnReg = directCallEvaluator(node, cg);
+      TR::Node::recreate(node, opCode);
+      if (needResult)
+         generateTrg1Src1Instruction(cg, TR::InstOpCode::mr, node, resultReg, returnReg); // Can opt
+
+      // helperReturnOOL: When returning from helper, ifInstanceOf may need to branch
+      if (ifInstanceOfNode)
+         {
+         // generateDepLabelInstruction(cg, TR::InstOpCode::label, node, helperReturnLabel, deps);
+         generateLabelInstruction(cg, TR::InstOpCode::label, node, helperReturnLabel);
+         generateTrg1Src1ImmInstruction(cg,TR::InstOpCode::Op_cmpli, node, crReg, returnReg, 1);
+         if(branchIfMatch)
+            generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, res1Label, crReg);
+         else
+            generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, res0Label, crReg);
+         }
+      generateDepLabelInstruction(cg, TR::InstOpCode::b, node, doneLabel, deps);
+      }
+   helperCallOOL->swapInstructionListsWithCompilation(); // OOL end.
+
+   cg->stopUsingRegister(objClassReg);
+   cg->stopUsingRegister(temp1Reg);
+   cg->stopUsingRegister(temp2Reg);
+   cg->stopUsingRegister(crReg);
+   if (!isCheckCast)
+      {
+      if (needResult)
+         node->setRegister(resultReg);
+      else
+         cg->stopUsingRegister(resultReg);
+      }
+   
+   // The object and castClass nodes are decremented  during the creation of the helper call
+   if (ifInstanceOfNode)
+      {
+      cg->decReferenceCount(ifInstanceOfNode->getFirstChild()); // instanceOf node
+      cg->decReferenceCount(ifInstanceOfNode->getSecondChild()); // valueNode
+      }
+   return (!ifInstanceOfNode ? node->getRegister() : NULL); // ifInstanceOfNode returns NULL when successful
+   }
+
+TR::Register *J9::Power::TreeEvaluator::genCheckCastOrInstanceOfForHelperCall(TR::Node* node, TR::CodeGenerator* cg, bool isCheckCast, TR::Node* ifInstanceOfNode)
+   {
+   TR::Compilation *comp = cg->comp();
+   // if (ifInstanceOfNode) return ((TR::Register *) 1); // TODO
+   TR::RegisterDependencyConditions *deps;
+   TR::Node *depNode;
+   int32_t numDep;
+   TR::LabelSymbol *doneLabel = generateLabelSymbol(cg);
+   TR::Register *crReg = cg->allocateRegister(TR_CCR); // not needed for checkcast TODO
+   TR::Register *resultReg;
+   TR::Register *returnReg;
+
+   if (ifInstanceOfNode && ifInstanceOfNode->getNumChildren() == 3)
+      {
+      depNode = ifInstanceOfNode->getChild(2);
+      numDep = depNode->getNumChildren();
+
+      if (numberOfRegisterCandidate(cg, depNode, TR_GPR) + 3 > cg->getMaximumNumberOfGPRsAllowedAcrossEdge(node))
+         return ((TR::Register *) 1);
+      
+      int32_t i1;
+      const TR::PPCLinkageProperties& properties = cg->getLinkage()->getProperties();
+      for (i1 = 0; i1 < depNode->getNumChildren(); i1++)
+         {
+         TR::Node *childNode = depNode->getChild(i1);
+         int32_t regIndex = cg->getGlobalRegister(childNode->getGlobalRegisterNumber());
+
+         int32_t validHighRegNum = TR::TreeEvaluator::getHighGlobalRegisterNumberIfAny(childNode, cg);
+
+         // if (needsHelperCall)
+            {
+            int32_t highIndex;
+
+            if (validHighRegNum != -1)
+               highIndex = cg->getGlobalRegister(validHighRegNum);
+
+            if (!properties.getPreserved((TR::RealRegister::RegNum) regIndex)
+                  || (validHighRegNum != -1 && !properties.getPreserved((TR::RealRegister::RegNum) highIndex)))
+               return ((TR::Register *) 1);
+            }
+         }
+
+      cg->evaluate(depNode);
+      deps = generateRegisterDependencyConditions(cg, depNode, 3);
+      cg->decReferenceCount(depNode);
+      }
+   else
+      deps = new (cg->trHeapMemory()) TR::RegisterDependencyConditions(0, 3, cg->trMemory());
+
+   if (node->getOpCodeValue() == TR::checkcastAndNULLCHK)
+      {
+      TR::Register *objectReg = cg->evaluate(node->getChild(0));
+      TR::Node *nullChkInfo = comp->findNullChkInfo(node);
+      TR::Instruction *gcPoint = generateNullTestInstructions(cg, objectReg, nullChkInfo, !cg->getHasResumableTrapHandler());
+      gcPoint->PPCNeedsGCMap(0x0);
+      }
+
+   bool branchIfMatch;
+   TR::LabelSymbol *branchLabel;
+   bool needResult = (!isCheckCast && (!ifInstanceOfNode || (ifInstanceOfNode && node->getReferenceCount() > 1)));
+   TR::ILOpCodes opCode = node->getOpCodeValue();
+
+   TR::Node::recreate(node, isCheckCast ? TR::call : TR::icall);
+   returnReg = directCallEvaluator(node, cg);
+   TR::Node::recreate(node, opCode);
+
+   // TR::LabelSymbol *helperReturnLabel = generateLabelSymbol(cg);
+   // TR::LabelSymbol *helperLabel = generateLabelSymbol(cg);
+   // generateLabelInstruction(cg, TR::InstOpCode::b, node, helperLabel);
+   // if(isCheckCast)
+   //    TR_PPCOutOfLineCodeSection *outlinedHelperCall = new (cg->trHeapMemory()) TR_PPCOutOfLineCodeSection(node, TR::call, 
+   //       NULL, helperLabel, helperReturnLabel, cg);
+   // else
+   //    TR_PPCOutOfLineCodeSection *outlinedHelperCall = new (cg->trHeapMemory()) TR_PPCOutOfLineCodeSection(node, TR::icall, 
+   //       resultReg, helperLabel, helperReturnLabel, cg);
+   // generateDepLabelInstruction(cg, TR::InstOpCode::label, node, doneLabel, deps);
+
+   // TR::Register   *objectReg = cg->evaluate(node->getFirstChild());
+   // TR::Register   *castClassReg = cg->evaluate(node->getSecondChild());
+   // genInstanceOfOrCheckCastHelperCall(node, objectReg, castClassReg, resultReg, cg);
+   // cg->decReferenceCount(node->getFirstChild());
+   // cg->decReferenceCount(node->getSecondChild());
+   // deps->addPostCondition(objectReg, TR::RealRegister::NoReg);
+   // deps->addPostCondition(castClassReg, TR::RealRegister::NoReg);
+
+   if (needResult)
+      {
+      resultReg = cg->allocateRegister();
+      generateTrg1Src1Instruction(cg, TR::InstOpCode::mr, node, resultReg, returnReg);
+      }
+
+   if (ifInstanceOfNode)
+      {
+      TR::ILOpCodes ifOpCode = ifInstanceOfNode->getOpCodeValue();
+      int32_t value = ifInstanceOfNode->getSecondChild()->getInt();
+      branchIfMatch = ((ifOpCode == TR::ificmpeq && value == 1) || (ifOpCode != TR::ificmpeq && value == 0));
+      branchLabel = ifInstanceOfNode->getBranchDestination()->getNode()->getLabel();
+
+      generateTrg1Src1ImmInstruction(cg,TR::InstOpCode::Op_cmpli, node, crReg, returnReg, 1);
+      if(branchIfMatch)
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, branchLabel, crReg);
+      else
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, branchLabel, crReg);
+      }
+   
+   // deps->addPostCondition(objectReg, TR::RealRegister::NoReg); // TODO, needed?
+   if (needResult)
+      deps->addPostCondition(resultReg, TR::RealRegister::NoReg); // TODO set to gr3?
+   // deps->addPostCondition(returnReg, TR::RealRegister::NoReg);
+   deps->addPostCondition(crReg, TR::RealRegister::cr0);
+
+   generateDepLabelInstruction(cg, TR::InstOpCode::label, node, doneLabel, deps);
+
+   if (!isCheckCast)
+      {
+      if (needResult)
+         node->setRegister(resultReg);
+      else
+         cg->stopUsingRegister(resultReg);
+         // TODO stop using returnReg??
+      }
+   cg->stopUsingRegister(crReg);
+
+   if (ifInstanceOfNode)
+      {
+      cg->decReferenceCount(ifInstanceOfNode->getFirstChild()); // instanceOf node
+      cg->decReferenceCount(ifInstanceOfNode->getSecondChild()); // valueNode
+      }
+   return (!ifInstanceOfNode ? node->getRegister() : NULL);
    }
 
 TR::Register *J9::Power::TreeEvaluator::VMcheckcastEvaluator(TR::Node *node, TR::CodeGenerator *cg)
