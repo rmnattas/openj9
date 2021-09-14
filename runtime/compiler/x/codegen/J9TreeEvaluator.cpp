@@ -7975,7 +7975,7 @@ J9::X86::TreeEvaluator::VMnewEvaluator(
       genInitObjectHeader(node, clazz, classReg, targetReg, tempReg, monitorSlotIsInitialized, false, cg);
       }
    TR::Register *discontiguousDataAddrOffsetReg = NULL;
-#ifdef TR_TARGET_64BIT
+#if defined(TR_TARGET_64BIT)
    if (isArrayNew)
       {
       /* Here we'll update dataAddr slot for both fixed and variable length arrays. Fixed length arrays are

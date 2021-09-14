@@ -10852,7 +10852,7 @@ J9::Z::TreeEvaluator::VMnewEvaluator(TR::Node * node, TR::CodeGenerator * cg)
          genInitArrayHeader(node, iCursor, isVariableLen, classAddress, NULL, resReg, zeroReg,
                enumReg, dataSizeReg, temp1Reg, litPoolBaseReg, conditions, cg);
 
-#ifdef TR_TARGET_64BIT
+#if defined(TR_TARGET_64BIT)
          /* Here we'll update dataAddr slot for both fixed and variable length arrays. Fixed length arrays are
           * simple as we just need to check first child of the node for array size. For variable length arrays
           * runtime size checks are needed to determine whether to use contiguous or discontiguous header layout.
