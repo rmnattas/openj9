@@ -82,6 +82,11 @@ public:
    }
    virtual TR::ResolvedMethodSymbol *methodSymbol() const { return _methodSymbol;}
 
+   /* A debugging tool that tracks how many arrays we would like to enable
+    * the contiguous-array-view optimization for. This can help us in situations
+    * where we want to figure out which specific array is causing an issue.
+    */
+   static int32_t _arrayChanges;
 private:
 
    bool trace(){ return comp()->getOption(TR_TraceBC) || comp()->getOption(TR_TraceILGen); }
@@ -210,6 +215,9 @@ private:
    void         storeArrayElement(TR::DataType dt, TR::ILOpCodes opCode, bool checks = true);
 
    void         calculateElementAddressInContiguousArray(int32_t, int32_t);
+#if defined(TR_TARGET_64BIT)
+   void         calculateElementAddressInContiguousArray(int32_t);
+#endif /* TR_TARGET_64BIT */
    void         calculateIndexFromOffsetInContiguousArray(int32_t, int32_t);
    void         calculateArrayElementAddress(TR::DataType, bool checks);
 
