@@ -84,7 +84,7 @@ MM_IndexableObjectAllocationModel::initializeAllocateDescription(MM_EnvironmentB
 		break;
 
 	case GC_ArrayletObjectModel::Discontiguous:
-		/* If double map or sparse heap is enabled, the only way to get here is through zero sized arrays.
+		/* If double map or sparse heap is enabled, the only way to get here is through zero sized arrays. */
 		if (isAllIndexableDataContiguousEnabled) {
 			Assert_MM_true((0 == _dataSize) && (0 == _numberOfArraylets));
 		}
