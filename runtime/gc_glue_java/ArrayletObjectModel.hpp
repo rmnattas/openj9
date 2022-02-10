@@ -939,30 +939,6 @@ public:
 	void AssertArrayPtrIsIndexable(J9IndexableObject *arrayPtr);
 
 	/**
-	 * Asserts that the dataAddr field of the indexable object is correct.
-	 *
-	 * @param arrayPtr      Pointer to the indexable object
-	 * @param dataAddr      Pointer to indexable object data address
-	 */
-	MMINLINE bool
-	isCorrectDataAddrContiguous(J9IndexableObject *arrayPtr, void *dataAddr)
-	{
-		return dataAddr == (void *)((uintptr_t)arrayPtr + contiguousHeaderSize());
-	}
-
-	/**
-	 * Asserts that an indexable object pointer is indeed an indexable object
-	 *
-	 * @param arrayPtr      Pointer to the indexable object
-	 * @param dataAddr      Pointer to indexable object data address
-	 */
-	MMINLINE bool
-	isCorrectDataAddrDiscontiguous(J9IndexableObject *arrayPtr, void *dataAddr)
-	{
-		return dataAddr == (void *)((uintptr_t)arrayPtr + discontiguousHeaderSize());
-	}
-
-	/**
 	 * Returns data pointer associated with a contiguous Indexable object.
 	 * Data pointer will always be pointing at the arraylet data. In this
 	 * case the data pointer will be pointing to address immediately after
@@ -1021,41 +997,46 @@ public:
 	}
 
 	/**
-	 * Asserts that the dataAddr field of the indexable object is correct.
+	 * Checks that the dataAddr field of the indexable object is correct.
 	 *
 	 * @param arrayPtr      Pointer to the indexable object
+	 * @param isValidDataAddrForDoubleMappedObject	Boolean to determine whether the given indexable object is double mapped
+	 * @return if the dataAddr field of the indexable object is correct
 	 */
 	MMINLINE bool
-	isCorrectDataAddr(J9IndexableObject *arrayPtr)
+	isCorrectDataAddr(J9IndexableObject *arrayPtr, bool isValidDataAddrForDoubleMappedObject)
 	{
-
-		return (InlineContiguous == getArrayLayout(arrayPtr))
-			? isCorrectDataAddrForContiguousArraylet(arrayPtr)
-			: isCorrectDataAddrForDiscontiguousArraylet(arrayPtr);
+		void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
+		return isCorrectDataAddr(arrayPtr, dataAddr, isValidDataAddrForDoubleMappedObject);
 	}
 
 	/**
-	 * Asserts that the dataAddr field of the contiguous arraylet is correct.
+	 * Checks that the dataAddr field of the indexable object is correct.
 	 *
 	 * @param arrayPtr      Pointer to the indexable object
+	 * @param isValidDataAddrForDoubleMappedObject	Boolean to determine whether the given indexable object is double mapped
+	 * @return if the dataAddr field of the indexable object is correct
 	 */
 	MMINLINE bool
-	isCorrectDataAddrForContiguousArraylet(J9IndexableObject *arrayPtr)
+	isCorrectDataAddr(J9IndexableObject *arrayPtr, void *dataAddr, bool isValidDataAddrForDoubleMappedObject)
 	{
-		void *dataAddr = getDataAddrForContiguous(arrayPtr);
-		return isCorrectDataAddrContiguous(arrayPtr, dataAddr);
-	}
+		bool isCorrectDataAddr = false;
+		uintptr_t dataSizeInBytes = getDataSizeInBytes(arrayPtr);
 
-	/**
-	 * Asserts that the dataAddr field of the indexable object is correct.
-	 *
-	 * @param arrayPtr      Pointer to the indexable object
-	 */
-	MMINLINE bool
-	isCorrectDataAddrForDiscontiguousArraylet(J9IndexableObject *arrayPtr)
-	{
-		void *dataAddr = getDataAddrForDiscontiguous(arrayPtr);
-		return isCorrectDataAddrDiscontiguous(arrayPtr, dataAddr);
+		if (0 == dataSizeInBytes) {
+			isCorrectDataAddr = (dataAddr == NULL);
+		} else if (dataSizeInBytes < _omrVM->_arrayletLeafSize) {
+			isCorrectDataAddr = (dataAddr == (void *)((uintptr_t)arrayPtr + contiguousHeaderSize()));
+		} else {
+			if (isVirtualLargeObjectHeapEnabled()) { 
+				isCorrectDataAddr = isValidDataAddrForDoubleMappedObject;
+			} else if (isDoubleMappingEnabled()) {
+				isCorrectDataAddr = isValidDataAddrForDoubleMappedObject && ((void *)((uintptr_t)arrayPtr + contiguousHeaderSize()) == getArrayoidPointer(arrayPtr));
+			} else {
+				isCorrectDataAddr = (dataAddr == NULL);
+			}
+		}
+		return isCorrectDataAddr;
 	}
 #endif /* J9VM_ENV_DATA64 */
 
