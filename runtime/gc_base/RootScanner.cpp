@@ -45,9 +45,7 @@
 #include "HeapRegionDescriptor.hpp"
 #include "HeapRegionIterator.hpp"
 #include "HeapRegionManager.hpp"
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 #include "HeapRegionIteratorVLHGC.hpp"
-#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 #include "MemoryPool.hpp"
 #include "MemorySubSpace.hpp"
 #include "MemorySpace.hpp"
@@ -249,6 +247,12 @@ MM_RootScanner::doDoubleMappedObjectSlot(J9Object *objectPtr, struct J9PortVmemI
 	/* No need to call doSlot() here since there's nothing to update */
 }
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+
+void
+MM_RootScanner::doObjectInVirtualLargeObjectHeap(J9Object *objectPtr)
+{
+	/* No need to call doSlot() here since there's nothing to update */
+}
 
 /**
  * @Perform operation on the given string cache table slot.
@@ -935,6 +939,24 @@ MM_RootScanner::scanDoubleMappedObjects(MM_EnvironmentBase *env)
 }
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 
+void
+MM_RootScanner::scanObjectsInVirtualLargeObjectHeap(MM_EnvironmentBase *env)
+{
+	if (_singleThread || J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+		GC_HeapRegionIteratorVLHGC regionIterator(_extensions->heap->getHeapRegionManager());
+		MM_HeapRegionDescriptorVLHGC *region = NULL;
+		reportScanningStarted(RootScannerEntity_SparseHeapObjects);
+		while (NULL != (region = regionIterator.nextRegion())) {
+			if (region->isArrayletLeaf()) {
+				J9Object *spineObject = (J9Object *)region->_allocateData.getSpine();
+				Assert_MM_true(NULL != spineObject);
+				doObjectInVirtualLargeObjectHeap(spineObject);
+			}
+		}
+		reportScanningEnded(RootScannerEntity_SparseHeapObjects);
+	}
+}
+
 /**
  * Scan all root set references from the VM into the heap.
  * For all slots that are hard root references into the heap, the appropriate slot handler will be called.
@@ -1066,6 +1088,12 @@ MM_RootScanner::scanClearable(MM_EnvironmentBase *env)
 		scanDoubleMappedObjects(env);
 	}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+
+#if defined(J9VM_ENV_DATA64) && !defined(J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION)
+	if (_includeVirtualLargeObjectHeap) {
+		scanObjectsInVirtualLargeObjectHeap(env);
+	}
+#endif /* J9VM_ENV_DATA64 && !J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
 }
 
 /**
@@ -1116,10 +1144,16 @@ MM_RootScanner::scanAllSlots(MM_EnvironmentBase *env)
 #endif /* J9VM_OPT_JVMTI */
 
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-        if (_includeDoubleMap) {
-                scanDoubleMappedObjects(env);
-        }
+	if (_includeDoubleMap) {
+		scanDoubleMappedObjects(env);
+	}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+
+#if defined(J9VM_ENV_DATA64) && !defined(J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION)
+	if (_includeVirtualLargeObjectHeap) {
+		scanObjectsInVirtualLargeObjectHeap(env);
+	}
+#endif /* J9VM_ENV_DATA64 && !J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
 
 	scanOwnableSynchronizerObjects(env);
 	scanContinuationObjects(env);

@@ -254,7 +254,6 @@ public:
 		return getSpineSizeWithoutHeader(layout, numberArraylets, dataSize, alignData);
 	}
 
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	/**
 	 * Checks if arraylet falls into corner case of discontigous data
 	 * Arraylet possible cases:
@@ -305,7 +304,6 @@ public:
 	{
 		return (1 == numArraylets(spine)) && (getSizeInElements(spine) > 0);
 	}
-#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 
 	/**
 	 * We can't use memcpy because it may be not atomic for pointers, use this function instead
@@ -843,7 +841,6 @@ public:
 	MMINLINE void **
 	dataAddrSlotForContiguous(J9IndexableObject *arrayPtr)
 	{
-		AssertContiguousArrayletLayout(arrayPtr);
 		bool const compressed = compressObjectReferences();
 		void **dataAddrPtr = NULL;
 		if (compressed) {
@@ -894,6 +891,22 @@ public:
 	}
 
 	/**
+	 * Sets data pointer of a contiguous indexable object.
+	 * Sets the data pointer of a contiguous indexable object; 
+	 *
+	 * @param arrayPtr      Pointer to the indexable object whose size is required
+	 * @param address       Pointer which points to indexable object data
+	 */
+	MMINLINE void
+	setDataAddrForContiguous(J9IndexableObject *arrayPtr, void *address)
+	{
+		void *calculatedDataAddr = address;
+		void **dataAddrPtr = dataAddrSlotForContiguous(arrayPtr);
+
+		*dataAddrPtr = calculatedDataAddr;
+	}
+
+	/**
 	 * Sets data pointer of a discontiguous indexable object.
 	 * Sets the data pointer of a discontiguous indexable object; in this case
 	 * dataAddr will point to the contiguous representation of the data
@@ -914,12 +927,6 @@ public:
 		 * exist hybrid arraylets (which will be dicontinued in the future) */
 		void *calculatedDataAddr = address;
 		void **dataAddrPtr = dataAddrSlotForDiscontiguous(arrayPtr);
-
-		/* If calculatedDataAddr is NULL then we make dataAddr point to the first arrayoid */
-		/* Later on, when sparse-heap is enabled by default, we must assert dataAddr is not NULL */
-		if (NULL == calculatedDataAddr) {
-			calculatedDataAddr = (void *)((uintptr_t)arrayPtr + discontiguousHeaderSize());
-		}
 
 		*dataAddrPtr = calculatedDataAddr;
 	}
@@ -1262,7 +1269,9 @@ public:
 	MMINLINE void *
 	getDataPointerForContiguous(J9IndexableObject *arrayPtr)
 	{
-		return (void *)((uintptr_t)arrayPtr + contiguousHeaderSize());
+		return compressObjectReferences()
+				? ((J9IndexableObjectContiguousCompressed *)arrayPtr)->dataAddr
+				: ((J9IndexableObjectContiguousFull *)arrayPtr)->dataAddr;
 	}
 
 
@@ -1332,6 +1341,27 @@ public:
 	void fixupInternalLeafPointersAfterCopy(J9IndexableObject *destinationPtr, J9IndexableObject *sourcePtr);
 
 	/**
+	 * Check if the arraylet data is adjacent to the header.
+	 * Mostly used for detection of camouflaged contiguous arrays that exist with doubleMapping or virtualLargeObjectHeap enabled
+	 * 
+	 * @param dataSizeInBytes the size of data in an indexable object, in bytes, including leaves and alignment padding
+	 * @return true if the arraylet data is adjacent to the header, false otherwise
+	 */
+	bool isArrayletDataAdjacentToHeader(J9IndexableObject *arrayPtr);
+
+	/**
+	 * Check if the arraylet data is adjacent to the header.
+	 * Mostly used for detection of camouflaged contiguous arrays that exist with doubleMapping or virtualLargeObjectHeap enabled
+	 * 
+	 * @param dataSizeInBytes the size of data in an indexable object, in bytes, including leaves and alignment padding
+	 * @return true if based on the value of dataSizeInBytes, the arraylet data is adjacent to the header, false otherwise
+	 */
+	bool isArrayletDataAdjacentToHeader(UDATA dataSizeInBytes);
+
+	bool isAddressWithinHeap(MM_GCExtensionsBase *extensions, void *address);
+	bool isIndexableObjectDoubleMapped(MM_GCExtensionsBase *extensions, J9IndexableObject *arrayPtr);
+
+	/**
 	 * Initialize the receiver, a new instance of GC_ObjectModel
 	 * 
 	 * @return true on success, false on failure
@@ -1357,5 +1387,10 @@ public:
 	 * Asserts that an Arraylet has true discontiguous layout
 	 */
 	void AssertDiscontiguousArrayletLayout(J9IndexableObject *objPtr);
+
+	/**
+	 * Asserts unreachable code if either Sparse Heap or double mapping is enabled
+	 */
+	void AssertContiguousArrayDataUnreachable();
 };
 #endif /* ARRAYLETOBJECTMODEL_ */

@@ -79,6 +79,7 @@
 #include "RegionBasedOverflowVLHGC.hpp"
 #include "RootScanner.hpp"
 #include "SegmentIterator.hpp"
+#include "SparseVirtualMemory.hpp"
 #include "StackSlotValidator.hpp"
 #include "SublistIterator.hpp"
 #include "SublistPool.hpp"
@@ -1357,10 +1358,22 @@ private:
 		if (!_markingScheme->isMarked(objectPtr)) {
 			MM_EnvironmentVLHGC::getEnvironment(_env)->_markVLHGCStats._doubleMappedArrayletsCleared += 1;
 			OMRPORT_ACCESS_FROM_OMRVM(_omrVM);
-			omrvmem_release_double_mapped_region(identifier->address, identifier->size, identifier);
+			if (_extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled()) {
+				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForIndexableObject((J9IndexableObject *)objectPtr);
+				_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr);
+			} else {
+				omrvmem_release_double_mapped_region(identifier->address, identifier->size, identifier);
+			}
 		}
     }
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+
+	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
+		if (!_markingScheme->isMarked(objectPtr)) {
+			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForIndexableObject((J9IndexableObject *)objectPtr);
+			_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr);
+		}
+	}
 
 	/**
 	 * @Clear the string table cache slot if the object is not marked

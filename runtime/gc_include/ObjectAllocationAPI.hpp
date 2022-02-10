@@ -108,8 +108,11 @@ private:
 			header->mustBeZero = 0;
 			header->size = 0;
 #if defined(J9VM_ENV_DATA64)
-			uintptr_t headerSize = sizeof(J9IndexableObjectDiscontiguousCompressed);
-			header->dataAddr = (void *)((uintptr_t)header + headerSize);
+			/* Can't set dataAddr to NULL as desired or else it leads to stall in gencon  */
+			//header->dataAddr = (void*)((uintptr_t)UDATA_MAX);
+			header->dataAddr = NULL;
+			//uintptr_t headerSize = sizeof(J9IndexableObjectDiscontiguousCompressed);
+			//header->dataAddr = (void *)((uintptr_t)header + headerSize);
 #endif /* J9VM_ENV_DATA64 */
 		} else {
 			J9IndexableObjectDiscontiguousFull *header = (J9IndexableObjectDiscontiguousFull*)*objectHeader;
@@ -117,8 +120,11 @@ private:
 			header->mustBeZero = 0;
 			header->size = 0;
 #if defined(J9VM_ENV_DATA64)
-			uintptr_t headerSize = sizeof(J9IndexableObjectDiscontiguousFull);
-			header->dataAddr = (void *)((uintptr_t)header + headerSize);
+			/* Can't set dataAddr to NULL as desired or else it leads to stall in gencon  */
+			//header->dataAddr = (void*)((uintptr_t)UDATA_MAX);
+			header->dataAddr = NULL;
+			//uintptr_t headerSize = sizeof(J9IndexableObjectDiscontiguousFull);
+			//header->dataAddr = (void *)((uintptr_t)header + headerSize);
 #endif /* J9VM_ENV_DATA64 */
 		}
 	}
