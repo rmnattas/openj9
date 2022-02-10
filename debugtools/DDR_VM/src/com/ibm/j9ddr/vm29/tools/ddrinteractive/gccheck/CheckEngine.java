@@ -253,19 +253,22 @@ class CheckEngine
 			try {
 				fieldIterator = GCObjectIterator.fromJ9Object(object, true);
 				addressIterator = GCObjectIterator.fromJ9Object(object, true);
+
+				if (false == (ObjectModel.isIndexable(object) && ObjectModel.isInlineContiguousArraylet(J9IndexableObjectPointer.cast(object)) && ObjectModel.getDataSizeInBytes(J9IndexableObjectPointer.cast(object)).gte(_javaVM.arrayletLeafSize()))) {
+					while (fieldIterator.hasNext()) {
+						J9ObjectPointer field = fieldIterator.next();
+						VoidPointer address = addressIterator.nextAddress();
+						result = checkSlotObjectHeap(field, ObjectReferencePointer.cast(address), regionDesc, object);
+						if(J9MODRON_SLOT_ITERATOR_OK != result) {
+							break;
+						}
+					}
+				}
 			} catch (CorruptDataException e) {
 				// TODO : cde should be part of the error
 				CheckError error = new CheckError(object, _cycle, _currentCheck, "Object ", J9MODRON_GCCHK_RC_CORRUPT_DATA_EXCEPTION, _cycle.nextErrorCount());
 				_reporter.report(error);
 				return J9MODRON_SLOT_ITERATOR_UNRECOVERABLE_ERROR;
-			}
-			while (fieldIterator.hasNext()) {
-				J9ObjectPointer field = fieldIterator.next();
-				VoidPointer address = addressIterator.nextAddress();
-				result = checkSlotObjectHeap(field, ObjectReferencePointer.cast(address), regionDesc, object);
-				if(J9MODRON_SLOT_ITERATOR_OK != result) {
-					break;
-				}
 			}
 		}
 		
@@ -432,7 +435,7 @@ class CheckEngine
 			if (classSlot.eq(J9MODRON_GCCHK_J9CLASS_EYECATCHER)) {
 				return J9MODRON_GCCHK_RC_OBJECT_SLOT_POINTS_TO_J9CLASS;
 			}
-
+			
 			return J9MODRON_GCCHK_RC_NOT_FOUND;
 		}
 		
@@ -1196,15 +1199,10 @@ class CheckEngine
 		}
 
 		if (J9BuildFlags.env_data64 && isIndexableDataAddressFlagSet() && ObjectModel.isIndexable(object)) {
-
 			boolean isCorrectData = true;
 			J9IndexableObjectPointer array = J9IndexableObjectPointer.cast(object);
 			try {
-				if (J9IndexableObjectHelper.isInlineContiguousArraylet(array)) {
-					isCorrectData = J9IndexableObjectHelper.getDataAddrForContiguous(array).equals(VoidPointer.cast(array.addOffset(J9IndexableObjectHelper.contiguousHeaderSize())));
-				} else {
-					isCorrectData = J9IndexableObjectHelper.getDataAddrForDiscontiguous(array).equals(VoidPointer.cast(array.addOffset(J9IndexableObjectHelper.discontiguousHeaderSize())));
-				}
+				isCorrectData = J9IndexableObjectHelper.isCorrectDataAddrPointer(array);
 			} catch (NoSuchFieldException e) {
 				/*
 				 * Do nothing - NoSuchFieldException from trying to access the indexable object field "dataAddr"
@@ -1222,6 +1220,7 @@ class CheckEngine
 		if ((checkFlags & J9MODRON_GCCHK_VERIFY_RANGE) != 0) {
 			UDATA regionEnd = UDATA.cast(regionDesc.getLowAddress()).add(regionDesc.getSize());
 			long delta = regionEnd.sub(UDATA.cast(object)).longValue();
+			J9IndexableObjectPointer array = J9IndexableObjectPointer.cast(object);
 			
 			/* Basic check that there is enough room for the object header */
 			if (delta < J9ObjectHelper.headerSize()) {
