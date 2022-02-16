@@ -1360,7 +1360,9 @@ private:
 			OMRPORT_ACCESS_FROM_OMRVM(_omrVM);
 			if (_extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled()) {
 				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForIndexableObject((J9IndexableObject *)objectPtr);
-				_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr);
+				if (_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr)) {
+					_extensions->indexableObjectModel.setDataAddrForContiguous((J9IndexableObject *)objectPtr, NULL);
+				}
 			} else {
 				omrvmem_release_double_mapped_region(identifier->address, identifier->size, identifier);
 			}
@@ -1371,7 +1373,9 @@ private:
 	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
 		if (!_markingScheme->isMarked(objectPtr)) {
 			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForIndexableObject((J9IndexableObject *)objectPtr);
-			_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr);
+			if (_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr)) {
+				_extensions->indexableObjectModel.setDataAddrForContiguous((J9IndexableObject *)objectPtr, NULL);
+			}
 		}
 	}
 
