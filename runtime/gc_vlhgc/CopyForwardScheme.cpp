@@ -4089,7 +4089,9 @@ private:
 				env->_copyForwardStats._doubleMappedArrayletsCleared += 1;
 				OMRPORT_ACCESS_FROM_OMRVM(_omrVM);
 				if (virtualLargeObjectHeapEnabled && NULL != dataAddr) {
-					_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(env, dataAddr);
+					if (_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr)) {
+						_extensions->indexableObjectModel.setDataAddrForContiguous((J9IndexableObject *)objectPtr, NULL);
+					}
 				} else {
 					omrvmem_release_double_mapped_region(identifier->address, identifier->size, identifier);
 				}
@@ -4121,7 +4123,9 @@ private:
 			if (NULL == forwardedObject) {
 				Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
 				if (NULL != dataAddr) {
-					largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr);
+					if (_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr)) {
+						_extensions->indexableObjectModel.setDataAddrForContiguous((J9IndexableObject *)objectPtr, NULL);
+					}
 				}
 			} else if (NULL != dataAddr) {
 				/* There might be the case that GC finds a floating arraylet, which was a result of an allocation

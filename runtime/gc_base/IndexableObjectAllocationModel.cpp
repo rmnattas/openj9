@@ -159,12 +159,15 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 			isArrayletDataAdjacentToHeader = indexableObjectModel->isArrayletDataAdjacentToHeader(spine);
 			if (isArrayletDataAdjacentToHeader) {
 				getAllocateDescription()->setDataAdjacentToHeader(true);
+#if defined(J9VM_ENV_DATA64)
+				indexableObjectModel->setDataAddrForContiguous(spine);
+#endif /* J9VM_ENV_DATA64 */
 			} else if (isAllIndexableDataContiguousEnabled) {
 				indexableObjectModel->setSizeInElementsForContiguous(spine, 0);
-			}
 #if defined(J9VM_ENV_DATA64)
-			indexableObjectModel->setDataAddrForContiguous(spine);
-#endif /* J9VM_ENV_DATA64 */
+				indexableObjectModel->setDataAddrForContiguous(spine, NULL);
+#endif /* J9VM_ENV_DATA */
+			}
 		}
 	}
 
