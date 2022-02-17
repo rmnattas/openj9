@@ -518,7 +518,7 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 #endif /* J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
 		void *virtualLargeObjectHeapAddress = extensions->largeObjectVirtualMemory->allocateSparseHeapRegionForDataAndAddDataToSparseDataPool(spine, byteAmount);
 		if (NULL != virtualLargeObjectHeapAddress) {
-			indexableObjectModel->setDataAddrForDiscontiguous((J9IndexableObject *)spine, virtualLargeObjectHeapAddress);
+			indexableObjectModel->setDataAddrForContiguous((J9IndexableObject *)spine, virtualLargeObjectHeapAddress);
 #if defined(J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION)
 			void *contiguousAddress = doubleMapArraylets(env, (J9Object *)spine, arrayletLeaveAddrs, firstLeafRegionDescriptor, virtualLargeObjectHeapAddress);
 			Assert_MM_true(virtualLargeObjectHeapAddress == contiguousAddress);

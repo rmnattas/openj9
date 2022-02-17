@@ -282,7 +282,7 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 		if (isAllIndexableDataContiguousEnabled) {
 			fj9object_t *arrayoidPtr = indexableObjectModel->getArrayoidPointer(arrayObject);
 			if (indexableObjectModel->isArrayletDataDiscontiguous(arrayObject)) {
-				data = indexableObjectModel->getDataAddrForDiscontiguous(arrayObject);
+				data = indexableObjectModel->getDataAddrForContiguous(arrayObject);
 				if ((NULL == data) || indexableObjectModel->isAddressWithinHeap(_extensions, data)) {
 					/* Doublemap failed, but we still need to continue execution; therefore fallback to previous approach */
 					copyArrayCritical(vmThread, indexableObjectModel, functions, &data, arrayObject, isCopy);
@@ -309,7 +309,7 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 		MM_JNICriticalRegion::enterCriticalRegion(vmThread, true);
 		Assert_MM_true(vmThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS);
 		arrayObject = (J9IndexableObject*)J9_JNI_UNWRAP_REFERENCE(array);
-		data = (void *)indexableObjectModel->getDataPointerForContiguous(arrayObject);
+		data = (void *)indexableObjectModel->getDataAddrForContiguous(arrayObject);
 #if defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)
 		/* we need to increment this region's critical count so that we know not to compact it */
 		UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(arrayObject))->_criticalRegionsInUse);
@@ -343,7 +343,7 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 			fj9object_t *arrayoidPtr = indexableObjectModel->getArrayoidPointer(arrayObject);
 			if (indexableObjectModel->isArrayletDataDiscontiguous(arrayObject)) {
 				void *data = NULL;
-				data = indexableObjectModel->getDataAddrForDiscontiguous(arrayObject);
+				data = indexableObjectModel->getDataAddrForContiguous(arrayObject);
 
 				if ((NULL == data) || indexableObjectModel->isAddressWithinHeap(_extensions, data)) {
 					/* Doublemap failed, but we still need to continue execution; therefore fallback to previous approach */
@@ -373,7 +373,7 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 		 * Objects can not be moved if critical section is active
 		 * This trace point will be generated if object has been moved or passed value of elems is corrupted
 		 */
-		void *data = (void *)indexableObjectModel->getDataPointerForContiguous(arrayObject);
+		void *data = (void *)indexableObjectModel->getDataAddrForContiguous(arrayObject);
 		if(elems != data) {
 			Trc_MM_JNIReleasePrimitiveArrayCritical_invalid(vmThread, arrayObject, elems, data);
 		}
@@ -418,7 +418,7 @@ MM_VLHGCAccessBarrier::jniGetStringCritical(J9VMThread* vmThread, jstring str, j
 		if (isAllIndexableDataContiguousEnabled) {
 			fj9object_t *arrayoidPtr = indexableObjectModel->getArrayoidPointer(valueObject);
 			if (indexableObjectModel->isArrayletDataDiscontiguous(valueObject)) {
-				data = (jchar *)indexableObjectModel->getDataAddrForDiscontiguous(valueObject);
+				data = (jchar *)indexableObjectModel->getDataAddrForContiguous(valueObject);
 
 				if (NULL == data) {
 					/* Doublemap failed, but we still need to continue execution; therefore fallback to previous approach */
@@ -445,7 +445,7 @@ MM_VLHGCAccessBarrier::jniGetStringCritical(J9VMThread* vmThread, jstring str, j
 		/* acquire access and return a direct pointer */
 		MM_JNICriticalRegion::enterCriticalRegion(vmThread, true);
 		Assert_MM_true(vmThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS);
-		data = (jchar*)_extensions->indexableObjectModel.getDataPointerForContiguous(valueObject);
+		data = (jchar*)_extensions->indexableObjectModel.getDataAddrForContiguous(valueObject);
 
 		if (NULL != isCopy) {
 			*isCopy = JNI_FALSE;
@@ -484,7 +484,7 @@ MM_VLHGCAccessBarrier::jniReleaseStringCritical(J9VMThread* vmThread, jstring st
 		if (isAllIndexableDataContiguousEnabled) {
 			if (indexableObjectModel->isArrayletDataDiscontiguous(valueObject)) {
 				void *data = NULL;
-				data = indexableObjectModel->getDataAddrForDiscontiguous(valueObject);
+				data = indexableObjectModel->getDataAddrForContiguous(valueObject);
 				if (NULL == data) {
 					/* Doublemap failed, but we still need to continue execution; therefore fallback to previous approach */
 					freeStringCritical(vmThread, functions, elems);
