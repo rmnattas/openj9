@@ -923,7 +923,7 @@ MM_RootScanner::scanDoubleMappedObjects(MM_EnvironmentBase *env)
 	if (_singleThread || J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
 		GC_HeapRegionIteratorVLHGC regionIterator(_extensions->heap->getHeapRegionManager());
 		MM_HeapRegionDescriptorVLHGC *region = NULL;
-		reportScanningStarted(RootScannerEntity_DoubleMappedObjects);
+		reportScanningStarted(RootScannerEntity_DoubleMappedOrVirtualLargeObjectHeapObjects);
 		while (NULL != (region = regionIterator.nextRegion())) {
 			if (region->isArrayletLeaf()) {
 				J9Object *spineObject = (J9Object *)region->_allocateData.getSpine();
@@ -934,7 +934,7 @@ MM_RootScanner::scanDoubleMappedObjects(MM_EnvironmentBase *env)
 				}
 			}
 		}
-		reportScanningEnded(RootScannerEntity_DoubleMappedObjects);
+		reportScanningEnded(RootScannerEntity_DoubleMappedOrVirtualLargeObjectHeapObjects);
 	}
 }
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
@@ -945,7 +945,7 @@ MM_RootScanner::scanObjectsInVirtualLargeObjectHeap(MM_EnvironmentBase *env)
 	if (_singleThread || J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
 		GC_HeapRegionIteratorVLHGC regionIterator(_extensions->heap->getHeapRegionManager());
 		MM_HeapRegionDescriptorVLHGC *region = NULL;
-		reportScanningStarted(RootScannerEntity_SparseHeapObjects);
+		reportScanningStarted(RootScannerEntity_DoubleMappedOrVirtualLargeObjectHeapObjects);
 		while (NULL != (region = regionIterator.nextRegion())) {
 			if (region->isArrayletLeaf()) {
 				J9Object *spineObject = (J9Object *)region->_allocateData.getSpine();
@@ -953,7 +953,7 @@ MM_RootScanner::scanObjectsInVirtualLargeObjectHeap(MM_EnvironmentBase *env)
 				doObjectInVirtualLargeObjectHeap(spineObject);
 			}
 		}
-		reportScanningEnded(RootScannerEntity_SparseHeapObjects);
+		reportScanningEnded(RootScannerEntity_DoubleMappedOrVirtualLargeObjectHeapObjects);
 	}
 }
 

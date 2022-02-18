@@ -1354,9 +1354,10 @@ private:
 
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	virtual void doDoubleMappedObjectSlot(J9Object *objectPtr, struct J9PortVmemIdentifier *identifier) {
-		MM_EnvironmentVLHGC::getEnvironment(_env)->_markVLHGCStats._doubleMappedArrayletsCandidates += 1;
+		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
+		env->_markVLHGCStats._doubleMappedOrVirtualLargeObjectHeapArrayletCandidates += 1;
 		if (!_markingScheme->isMarked(objectPtr)) {
-			MM_EnvironmentVLHGC::getEnvironment(_env)->_markVLHGCStats._doubleMappedArrayletsCleared += 1;
+			env->_markVLHGCStats._doubleMappedOrVirtualLargeObjectHeapArrayletsCleared += 1;
 			OMRPORT_ACCESS_FROM_OMRVM(_omrVM);
 			if (_extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled()) {
 				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForIndexableObject((J9IndexableObject *)objectPtr);
@@ -1372,7 +1373,10 @@ private:
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 
 	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
+		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
+		env->_markVLHGCStats._doubleMappedOrVirtualLargeObjectHeapArrayletCandidates += 1;
 		if (!_markingScheme->isMarked(objectPtr)) {
+			env->_markVLHGCStats._doubleMappedOrVirtualLargeObjectHeapArrayletsCleared += 1;
 			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForIndexableObject((J9IndexableObject *)objectPtr);
 			if (_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr)) {
 				//Should dataAddr be set to NULL regardless of freeSparseRegionForDataAndRemoveDataFromSparseDataPool return value??
