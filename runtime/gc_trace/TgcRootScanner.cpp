@@ -53,8 +53,7 @@ const static char *attributeNames[] = {
 	"stringtable", /* RootScannerEntity_StringTable */
 	"jniglobalrefs", /* RootScannerEntity_JNIGlobalReferences */
 	"jniweakglobalrefs", /* RootScannerEntity_JNIWeakGlobalReferences */
-	"doubleMappedObjects", /* RootScannerEntity_DoubleMappedObjects */
-	"sparseHeapObjects", /* RootScannerEntity_SparseHeapObjects */
+	"doubleMappedOrVirtualLargeObjectHeapObjects", /* RootScannerEntity_DoubleMappedOrVirtualLargeObjectHeapObjects */
 	"debuggerrefs", /* RootScannerEntity_DebuggerReferences */
 	"debuggerclassrefs", /* RootScannerEntity_DebuggerClassReferences */
 	"monitorrefs", /* RootScannerEntity_MonitorReferences */
