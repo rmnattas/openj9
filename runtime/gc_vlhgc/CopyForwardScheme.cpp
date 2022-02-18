@@ -4090,6 +4090,7 @@ private:
 				OMRPORT_ACCESS_FROM_OMRVM(_omrVM);
 				if (virtualLargeObjectHeapEnabled && NULL != dataAddr) {
 					if (_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr)) {
+						//Should dataAddr be set to NULL regardless of freeSparseRegionForDataAndRemoveDataFromSparseDataPool return value??
 						_extensions->indexableObjectModel.setDataAddrForContiguous((J9IndexableObject *)objectPtr, NULL);
 					}
 				} else {
@@ -4124,6 +4125,7 @@ private:
 				Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
 				if (NULL != dataAddr) {
 					if (_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr)) {
+						//Should dataAddr be set to NULL regardless of freeSparseRegionForDataAndRemoveDataFromSparseDataPool return value??
 						_extensions->indexableObjectModel.setDataAddrForContiguous((J9IndexableObject *)objectPtr, NULL);
 					}
 				}
