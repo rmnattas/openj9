@@ -1089,11 +1089,11 @@ MM_RootScanner::scanClearable(MM_EnvironmentBase *env)
 	}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 
-#if defined(J9VM_ENV_DATA64) && !defined(J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_ENV_DATA64) && !defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
 	if (_includeVirtualLargeObjectHeap) {
 		scanObjectsInVirtualLargeObjectHeap(env);
 	}
-#endif /* J9VM_ENV_DATA64 && !J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
+#endif /* J9VM_ENV_DATA64 && !J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
 }
 
 /**
@@ -1149,11 +1149,11 @@ MM_RootScanner::scanAllSlots(MM_EnvironmentBase *env)
 	}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 
-#if defined(J9VM_ENV_DATA64) && !defined(J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_ENV_DATA64) && !defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
 	if (_includeVirtualLargeObjectHeap) {
 		scanObjectsInVirtualLargeObjectHeap(env);
 	}
-#endif /* J9VM_ENV_DATA64 && !J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
+#endif /* J9VM_ENV_DATA64 && !J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
 
 	scanOwnableSynchronizerObjects(env);
 	scanContinuationObjects(env);

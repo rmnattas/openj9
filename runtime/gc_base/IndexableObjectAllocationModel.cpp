@@ -446,9 +446,9 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 	const UDATA arrayletLeafSize = env->getOmrVM()->_arrayletLeafSize;
 	uintptr_t byteAmount = 0;
 	UDATA arrayletLeafCount = MM_Math::roundToCeiling(arrayletLeafSize, _dataSize) / arrayletLeafSize;
-#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
 	MM_HeapRegionDescriptorVLHGC *firstLeafRegionDescriptor = NULL;
-#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
+#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
 #define ARRAYLET_ALLOC_THRESHOLD 64
 	void *leaves[ARRAYLET_ALLOC_THRESHOLD];
 	void **arrayletLeaveAddrs = leaves;
@@ -481,21 +481,21 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 			break;
 		}
 
-#if !defined(J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION)
+#if !defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
 		/* Disable region for reads and writes, since that'll be done through the contiguous double mapped region */
 		void *highAddress = (void*)((uintptr_t)leaf + arrayletLeafSize);
 		bool ret = extensions->heap->decommitMemory(leaf, arrayletLeafSize, leaf, highAddress);
 		if (!ret) {
 			Trc_MM_VirtualMemory_decommitMemory_failure(leaf, arrayletLeafSize);
 		}
-#endif /* !J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
+#endif /* !J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
 
 		arrayletLeaveAddrs[arrayoidIndex] = leaf;
-#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
 		if (0 == arrayoidIndex) {
 			firstLeafRegionDescriptor = (MM_HeapRegionDescriptorVLHGC *)extensions->getHeap()->getHeapRegionManager()->tableDescriptorForAddress(leaf);
 		}
-#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
+#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
 
 		bytesRemaining -= OMR_MIN(bytesRemaining, arrayletLeafSize);
 		arrayoidIndex += 1;
@@ -510,20 +510,20 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 		Assert_MM_true(indexableObjectModel->isVirtualLargeObjectHeapEnabled());
 		Assert_MM_true(arrayletLeafCount == arrayoidIndex);
 
-#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
 		/* ByteAmount for OSX must be same size as the amount that will be double mapped */
 		byteAmount = arrayletLeafCount * arrayletLeafSize;
 #else
 		byteAmount = _dataSize;
-#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
+#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
 		void *virtualLargeObjectHeapAddress = extensions->largeObjectVirtualMemory->allocateSparseHeapRegionForDataAndAddDataToSparseDataPool(spine, byteAmount);
 		if (NULL != virtualLargeObjectHeapAddress) {
 			indexableObjectModel->setDataAddrForContiguous((J9IndexableObject *)spine, virtualLargeObjectHeapAddress);
-#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
 			void *contiguousAddress = doubleMapArraylets(env, (J9Object *)spine, arrayletLeaveAddrs, firstLeafRegionDescriptor, virtualLargeObjectHeapAddress);
 			Assert_MM_true(virtualLargeObjectHeapAddress == contiguousAddress);
 			extensions->largeObjectVirtualMemory->recordDoubleMapIdentifierForData(virtualLargeObjectHeapAddress, &firstLeafRegionDescriptor->_arrayletDoublemapID);
-#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
+#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
 		}
 		/* Free arraylet leaf addresses if dynamically allocated */
 		if (arrayletLeafCount > ARRAYLET_ALLOC_THRESHOLD) {

@@ -93,11 +93,11 @@ MM_ConfigurationIncrementalGenerational::createHeapWithManager(MM_EnvironmentBas
 {
 	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
 
-#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
 	if (extensions->isVirtualLargeObjectHeapRequested) {
 		extensions->isArrayletDoubleMapRequested = true;
 	}
-#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
+#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
 
 	MM_Heap *heap = MM_HeapVirtualMemory::newInstance(env, extensions->heapAlignment, heapBytesRequested, regionManager);
 	if (NULL == heap) {
@@ -120,11 +120,11 @@ MM_ConfigurationIncrementalGenerational::createHeapWithManager(MM_EnvironmentBas
 	 * If both double mapping and sparse heap are requested, sparse heap takes precedence
 	 * over double mapping.
 	 */
-#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
 	if ((extensions->isArrayletDoubleMapRequested || extensions->isVirtualLargeObjectHeapRequested) && extensions->isArrayletDoubleMapAvailable) {
-#else /* J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
+#else /* J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
 	if (extensions->isArrayletDoubleMapRequested && !extensions->isVirtualLargeObjectHeapRequested && extensions->isArrayletDoubleMapAvailable) {
-#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_OSX_SPARSE_HEAP_ALLOCATION */
+#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
 		uintptr_t pagesize = heap->getPageSize();
 		if (!extensions->memoryManager->isLargePage(env, pagesize) || (pagesize <= extensions->getOmrVM()->_arrayletLeafSize)) {
 			extensions->indexableObjectModel.setEnableDoubleMapping(true);
