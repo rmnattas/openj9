@@ -106,7 +106,11 @@ MM_ConfigurationRealtime::tearDown(MM_EnvironmentBase* env)
 MM_Heap *
 MM_ConfigurationRealtime::createHeapWithManager(MM_EnvironmentBase *env, uintptr_t heapBytesRequested, MM_HeapRegionManager *regionManager)
 {
-	return MM_HeapVirtualMemory::newInstance(env, env->getExtensions()->heapAlignment, heapBytesRequested, regionManager);
+        MM_GCExtensionsBase* extensions = env->getExtensions();
+        Assert_GC_true_with_message(env, false == extensions->isVirtualLargeObjectHeapRequested, "%s is not supported on metronome.\n", "-XX:enableVirtualLargeObjectHeap");
+        Assert_GC_true_with_message(env, false == extensions->isArrayletDoubleMapRequested, "%s is not supported on metronome.\n", "-Xgc:enableArrayletDoubleMapping");
+
+        return MM_HeapVirtualMemory::newInstance(env, extensions->heapAlignment, heapBytesRequested, regionManager);
 }
 
 MM_MemorySpace *
