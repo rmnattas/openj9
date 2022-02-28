@@ -75,8 +75,8 @@ public:
 	uintptr_t _monitorReferenceCandidates; /**< The number of monitor references that have been visited in monitor table during marking */
 
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP) || defined(J9VM_ENV_DATA64)
-	uintptr_t _doubleMappedOrVirtualLargeObjectHeapArrayletsCleared; /**< The number of double mapped arraylets that have been cleared durign marking */
-	uintptr_t _doubleMappedOrVirtualLargeObjectHeapArrayletCandidates; /**< The number of double mapped arraylets that have been visited during marking */
+	uintptr_t _doubleMappedOrVirtualLargeObjectHeapArrayletsCleared; /**< The number of double mapped or sparse heap allocated arraylets that have been cleared durign marking */
+	uintptr_t _doubleMappedOrVirtualLargeObjectHeapArrayletCandidates; /**< The number of double mapped or sparse heap allocated arraylets that have been visited during marking */
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP || J9VM_ENV_DATA64 */
 
 #if defined(J9MODRON_TGC_PARALLEL_STATISTICS)

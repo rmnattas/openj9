@@ -1384,7 +1384,7 @@ MM_WriteOnceCompactor::fixupPointerArrayObject(MM_EnvironmentVLHGC* env, J9Objec
 	GC_ArrayletObjectModel::ArrayLayout layout = _extensions->indexableObjectModel.getArrayLayout((J9IndexableObject*)objectPtr);
 		
 	if (GC_ArrayletObjectModel::InlineContiguous == layout) {
-		if (!_extensions->indexableObjectModel.isArrayletDataAdjacentToHeader((J9IndexableObject*)objectPtr) && _extensions->indexableObjectModel.isDoubleMappingEnabled()) {
+		if ((!_extensions->indexableObjectModel.isArrayletDataAdjacentToHeader((J9IndexableObject*)objectPtr)) && _extensions->indexableObjectModel.isDoubleMappingEnabled()) {
 			/* do nothing - no inline pointers */
 		} else {
 			UDATA elementsToWalk = _extensions->indexableObjectModel.getSizeInElements((J9IndexableObject*)objectPtr);

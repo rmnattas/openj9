@@ -97,13 +97,13 @@ GC_ArrayletObjectModelBase::getSpineSizeWithoutHeader(ArrayLayout layout, UDATA 
 	}
 	bool isAllIndexableDataContiguousEnabled = extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled();
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-	isAllIndexableDataContiguousEnabled = isAllIndexableDataContiguousEnabled || extensions->indexableObjectModel.isDoubleMappingEnabled();
+	isAllIndexableDataContiguousEnabled = (isAllIndexableDataContiguousEnabled || extensions->indexableObjectModel.isDoubleMappingEnabled());
 #endif
 
 	UDATA spineDataSize = 0;
 	if (InlineContiguous == layout) {
 		spineDataSize = dataSize; // All data in spine
-		if (isAllIndexableDataContiguousEnabled && !extensions->indexableObjectModel.isArrayletDataAdjacentToHeader(dataSize)) {
+		if (isAllIndexableDataContiguousEnabled && (!extensions->indexableObjectModel.isArrayletDataAdjacentToHeader(dataSize))) {
 			spineDataSize = 0;
 		}
 	} else if (Hybrid == layout) {

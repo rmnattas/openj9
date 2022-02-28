@@ -483,9 +483,7 @@ MM_VLHGCAccessBarrier::jniReleaseStringCritical(J9VMThread* vmThread, jstring st
 #endif
 		if (isAllIndexableDataContiguousEnabled) {
 			if (indexableObjectModel->isArrayletDataDiscontiguous(valueObject)) {
-				void *data = NULL;
-				data = indexableObjectModel->getDataAddrForContiguous(valueObject);
-				if (NULL == data) {
+				if (NULL == indexableObjectModel->getDataAddrForContiguous(valueObject)) {
 					/* Doublemap failed, but we still need to continue execution; therefore fallback to previous approach */
 					freeStringCritical(vmThread, functions, elems);
 				}

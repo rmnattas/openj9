@@ -1339,7 +1339,22 @@ public:
 	 */
 	bool isArrayletDataAdjacentToHeader(UDATA dataSizeInBytes);
 
+	/**
+	 * Check if the arraylet data is within the heap.
+	 * 
+	 * @param extensions pointer to MM_GCExtensionsBase
+	 * @param address   pointer to arraylet data that we will check to see if it resides in the heap
+	 * @return true if the address given for the arraylet data is within the heap
+	 */
 	bool isAddressWithinHeap(MM_GCExtensionsBase *extensions, void *address);
+	
+	/**
+	 * Check if the indexable object is double mapped.
+	 * 
+	 * @param extensions pointer to MM_GCExtensionsBase
+	 * @param arrayPtr  pointer to indexable object we are checking to see if it is double mapped
+	 * @return true if the indexable object is double mapped
+	 */
 	bool isIndexableObjectDoubleMapped(MM_GCExtensionsBase *extensions, J9IndexableObject *arrayPtr);
 
 	/**

@@ -372,7 +372,7 @@ MM_StandardAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jar
 
 	bool shouldCopy = false;
 	bool alwaysCopyInCritical = (javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL;
-	if (alwaysCopyInCritical || !indexableObjectModel->isInlineContiguousArraylet(arrayObject)) {
+	if (alwaysCopyInCritical || (!indexableObjectModel->isInlineContiguousArraylet(arrayObject))) {
 		shouldCopy = true;
 	}
 
@@ -401,7 +401,7 @@ MM_StandardAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread,
 
 	bool shouldCopy = false;
 	bool alwaysCopyInCritical = (javaVM->runtimeFlags & J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL) == J9_RUNTIME_ALWAYS_COPY_JNI_CRITICAL;
-	if (alwaysCopyInCritical || !indexableObjectModel->isInlineContiguousArraylet(arrayObject)) {
+	if (alwaysCopyInCritical || (!indexableObjectModel->isInlineContiguousArraylet(arrayObject))) {
 		shouldCopy = true;
 	}
 
