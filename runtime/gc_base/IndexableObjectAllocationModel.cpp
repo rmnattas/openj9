@@ -78,7 +78,7 @@ MM_IndexableObjectAllocationModel::initializeAllocateDescription(MM_EnvironmentB
 		/* all good */
 		setAllocatable(true);
 		/* If we're dealing with camuflaged discontiguous we must call */
-		if (isAllIndexableDataContiguousEnabled && !extensions->indexableObjectModel.isArrayletDataAdjacentToHeader(_dataSize)) {
+		if (isAllIndexableDataContiguousEnabled && (!extensions->indexableObjectModel.isArrayletDataAdjacentToHeader(_dataSize))) {
 			layoutSizeInBytes = _dataSize;
 		}
 		break;
@@ -196,7 +196,7 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 #endif
 		}
 
-		if (!isAllIndexableDataContiguousEnabled || isArrayletDataAdjacentToHeader) {
+		if ((!isAllIndexableDataContiguousEnabled) || isArrayletDataAdjacentToHeader) {
 			Assert_MM_true(1 == _numberOfArraylets);
 		}
 		break;
@@ -538,7 +538,7 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 #if !((defined(LINUX) || defined(OSX)) && defined(J9VM_ENV_DATA64))
-/* Double map is only supported on LINUX 64 bit Systems for now */
+/* Double map is only supported on OSX and LINUX 64 bit Systems for now */
 #error "Platform not supported by Double Map API"
 #endif /* !((defined(LINUX) || defined(OSX)) && defined(J9VM_ENV_DATA64)) */
 void * 

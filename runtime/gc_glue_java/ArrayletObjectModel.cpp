@@ -174,7 +174,7 @@ GC_ArrayletObjectModel::isArrayletDataAdjacentToHeader(UDATA dataSizeInBytes)
 {
 	MM_GCExtensionsBase* extensions = MM_GCExtensionsBase::getExtensions(_omrVM);
 	UDATA minimumSpineSizeAfterGrowing = extensions->getObjectAlignmentInBytes();
-	return (_largestDesirableArraySpineSize == UDATA_MAX) || (dataSizeInBytes <= (_largestDesirableArraySpineSize - minimumSpineSizeAfterGrowing - contiguousHeaderSize()));
+	return ((UDATA_MAX == _largestDesirableArraySpineSize) || (dataSizeInBytes <= (_largestDesirableArraySpineSize - minimumSpineSizeAfterGrowing - contiguousHeaderSize())));
 }
 
 bool
@@ -190,7 +190,7 @@ GC_ArrayletObjectModel::isIndexableObjectDoubleMapped(MM_GCExtensionsBase *exten
 	void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
 	bool isObjectWithinHeap = isAddressWithinHeap(extensions, dataAddr);
 
-	return (NULL != dataAddr) && !isObjectWithinHeap;
+	return ((NULL != dataAddr) && (!isObjectWithinHeap));
 }
 
 #if defined(J9VM_ENV_DATA64)

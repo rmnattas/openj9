@@ -121,9 +121,9 @@ MM_ConfigurationIncrementalGenerational::createHeapWithManager(MM_EnvironmentBas
 	 * over double mapping.
 	 */
 #if defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
-	if ((extensions->isArrayletDoubleMapRequested || extensions->isVirtualLargeObjectHeapRequested) && extensions->isArrayletDoubleMapAvailable) {
+	if ((extensions->isArrayletDoubleMapRequested || extensions->isVirtualLargeObjectHeapRequested) && (extensions->isArrayletDoubleMapAvailable)) {
 #else /* J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
-	if (extensions->isArrayletDoubleMapRequested && !extensions->isVirtualLargeObjectHeapRequested && extensions->isArrayletDoubleMapAvailable) {
+	if ((extensions->isArrayletDoubleMapRequested) && (!extensions->isVirtualLargeObjectHeapRequested) && (extensions->isArrayletDoubleMapAvailable)) {
 #endif /* J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
 		uintptr_t pagesize = heap->getPageSize();
 		if (!extensions->memoryManager->isLargePage(env, pagesize) || (pagesize <= extensions->getOmrVM()->_arrayletLeafSize)) {

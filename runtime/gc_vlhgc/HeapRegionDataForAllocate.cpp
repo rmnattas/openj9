@@ -194,7 +194,7 @@ MM_HeapRegionDataForAllocate::removeFromArrayletLeafList(MM_EnvironmentVLHGC *en
 	Assert_MM_true(NULL != previous);
 	/**
 	 * Restore/Recommit arraylet leaves that have been previously decommited
-	 * IS THIS ACTUALLY NEEDED? Think this may not be necessary.
+	 * TODO: Is this necessary?
 	 */
 	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
 
@@ -202,9 +202,8 @@ MM_HeapRegionDataForAllocate::removeFromArrayletLeafList(MM_EnvironmentVLHGC *en
 	void *leafAddress = _region->getLowAddress();
 	bool ret = extensions->heap->commitMemory(leafAddress, arrayletLeafSize);
 	if (!ret) {
-		printf("ERROR: Falied to recommit in-heap region. leafAddress: %p, arrayletLeafSize: %zu\n", leafAddress, arrayletLeafSize);
+		printf("ERROR: Failed to recommit in-heap region. leafAddress: %p, arrayletLeafSize: %zu\n", leafAddress, arrayletLeafSize);
 	}
-
 
 	previous->_allocateData._nextArrayletLeafRegion = next;
 	if (NULL != next) {
