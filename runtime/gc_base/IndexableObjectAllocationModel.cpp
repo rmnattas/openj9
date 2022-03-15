@@ -414,12 +414,12 @@ MM_IndexableObjectAllocationModel::reserveLeavesForContiguousArraylet(MM_Environ
 
 	/* refresh the spine -- it might move if we GC while allocating the leaf */
 	spine = _allocateDescription.getSpine();
-	/* Number of arraylet leaves in the iterator must match the number of leaves calculated */
-	Assert_MM_true(arrayletLeafCount == arrayoidIndex);
 
 	if ((NULL != spine) && (NULL != firstLeafRegionDescriptor)) {
 		Assert_MM_true(_layout == GC_ArrayletObjectModel::InlineContiguous);
 		Assert_MM_true(indexableObjectModel->isDoubleMappingEnabled());
+		/* Number of arraylet leaves in the iterator must match the number of leaves calculated */
+		Assert_MM_true(arrayletLeafCount == arrayoidIndex);
 
 		void *contiguousAddress = doubleMapArraylets(env, (J9Object *)spine, arrayletLeaveAddrs, firstLeafRegionDescriptor, NULL);
 		if (NULL != contiguousAddress) {
@@ -503,11 +503,15 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 
 	/* refresh the spine -- it might move if we GC while allocating the leaf */
 	spine = _allocateDescription.getSpine();
-	/* Number of arraylet leaves in the iterator must match the number of leaves calculated */
 
-	if (NULL != spine) {
+	if ((NULL != spine)
+	#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
+	&& (NULL != firstLeafRegionDescriptor)
+	#endif /* J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
+	) {
 		Assert_MM_true(_layout == GC_ArrayletObjectModel::InlineContiguous);
 		Assert_MM_true(indexableObjectModel->isVirtualLargeObjectHeapEnabled());
+		/* Number of arraylet leaves in the iterator must match the number of leaves calculated */
 		Assert_MM_true(arrayletLeafCount == arrayoidIndex);
 
 #if defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
