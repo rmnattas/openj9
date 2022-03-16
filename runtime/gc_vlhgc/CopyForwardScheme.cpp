@@ -4080,7 +4080,7 @@ private:
 			MM_ForwardedHeader forwardedHeader(objectPtr, _extensions->compressObjectReferences());
 			void *forwardedObject = forwardedHeader.getForwardedObject();
 			bool virtualLargeObjectHeapEnabled = _extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled();
-			
+			/* If forwardedObject is NULL, free the double mapped region occupied by the data of the indexable object */
 			if (NULL == forwardedObject) {
 				Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
 				env->_copyForwardStats._doubleMappedOrVirtualLargeObjectHeapArrayletsCleared += 1;
@@ -4094,7 +4094,7 @@ private:
 				}
 			} else if (virtualLargeObjectHeapEnabled && NULL != dataAddr) {
 				/* There might be the case that GC finds a floating arraylet, which was a result of an allocation
-				 * failure (reason why this GC cycle is happening). */ 
+				 * failure (reason why this GC cycle is happening). */
 				_extensions->largeObjectVirtualMemory->updateSparseDataEntryAfterObjectHasMoved(dataAddr, forwardedObject);
 			}
 			objectPtr = forwardedHeader.getForwardedObject();
