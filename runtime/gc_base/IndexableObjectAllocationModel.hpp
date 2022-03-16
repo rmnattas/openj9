@@ -61,10 +61,10 @@ public:
 private:
 	/**
 	 * For contiguous arraylet all data is subsumed into the spine.
-	 * 
+	 *
 	 * @param env thread GC Environment
 	 * @param spine indexable object spine
-	 * 
+	 *
 	 * @return initialized arraylet spine with its arraylet pointers initialized.
 	 */
 	MMINLINE J9IndexableObject *layoutContiguousArraylet(MM_EnvironmentBase *env, J9IndexableObject *spine);
@@ -73,10 +73,10 @@ private:
 	 * For non-contiguous arraylet (i.e. discontiguous and hybrid), perform separate allocations
 	 * for spine and leaf data. The spine and attached leaves may move as each leaf is allocated
 	 * is GC is allowed. The final location of the spine is returned.
-	 * 
+	 *
 	 * @param env thread GC Environment
 	 * @param spine indexable object spine
-	 * 
+	 *
 	 * @return initialized arraylet spine with its arraylet pointers initialized.
 	 */
 	MMINLINE J9IndexableObject *layoutDiscontiguousArraylet(MM_EnvironmentBase *env, J9IndexableObject *spine);
@@ -89,7 +89,7 @@ private:
 	 *
 	 * @param env thread GC Environment
 	 * @param spine indexable object spine
-	 * 
+	 *
 	 * @return initialized arraylet spine with its arraylet pointers initialized.
 	 */
 	MMINLINE J9IndexableObject *reserveLeavesForContiguousArraylet(MM_EnvironmentBase *env, J9IndexableObject *spine);
@@ -102,7 +102,7 @@ private:
 	 *
 	 * @param env thread GC Environment
 	 * @param spine indexable object spine
-	 * 
+	 *
 	 * @return initialized arraylet spine with its arraylet pointers initialized.
 	 */
 	MMINLINE J9IndexableObject *getSparseAddressAndDecommitLeaves(MM_EnvironmentBase *env, J9IndexableObject *spine);

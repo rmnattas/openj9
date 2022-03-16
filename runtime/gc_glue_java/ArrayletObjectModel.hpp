@@ -892,7 +892,7 @@ public:
 
 	/**
 	 * Sets data pointer of a contiguous indexable object.
-	 * Sets the data pointer of a contiguous indexable object; 
+	 * Sets the data pointer of a contiguous indexable object;
 	 *
 	 * @param arrayPtr      Pointer to the indexable object whose size is required
 	 * @param address       Pointer which points to indexable object data
@@ -1028,7 +1028,7 @@ public:
 		} else if (dataSizeInBytes < _omrVM->_arrayletLeafSize) {
 			isCorrectDataAddr = (dataAddr == (void *)((uintptr_t)arrayPtr + contiguousHeaderSize()));
 		} else {
-			if (isVirtualLargeObjectHeapEnabled()) { 
+			if (isVirtualLargeObjectHeapEnabled()) {
 				isCorrectDataAddr = isValidDataAddrForDoubleMappedObject;
 			} else if (isDoubleMappingEnabled()) {
 				isCorrectDataAddr = isValidDataAddrForDoubleMappedObject && ((void *)((uintptr_t)arrayPtr + contiguousHeaderSize()) == getArrayoidPointer(arrayPtr));
@@ -1324,7 +1324,7 @@ public:
 	/**
 	 * Check if the arraylet data is adjacent to the header.
 	 * Mostly used for detection of camouflaged contiguous arrays that exist with doubleMapping or virtualLargeObjectHeap enabled
-	 * 
+	 *
 	 * @param dataSizeInBytes the size of data in an indexable object, in bytes, including leaves and alignment padding
 	 * @return true if the arraylet data is adjacent to the header, false otherwise
 	 */
@@ -1333,7 +1333,7 @@ public:
 	/**
 	 * Check if the arraylet data is adjacent to the header.
 	 * Mostly used for detection of camouflaged contiguous arrays that exist with doubleMapping or virtualLargeObjectHeap enabled
-	 * 
+	 *
 	 * @param dataSizeInBytes the size of data in an indexable object, in bytes, including leaves and alignment padding
 	 * @return true if based on the value of dataSizeInBytes, the arraylet data is adjacent to the header, false otherwise
 	 */
@@ -1341,16 +1341,16 @@ public:
 
 	/**
 	 * Check if the arraylet data is within the heap.
-	 * 
+	 *
 	 * @param extensions pointer to MM_GCExtensionsBase
 	 * @param address   pointer to arraylet data that we will check to see if it resides in the heap
 	 * @return true if the address given for the arraylet data is within the heap
 	 */
 	bool isAddressWithinHeap(MM_GCExtensionsBase *extensions, void *address);
-	
+
 	/**
 	 * Check if the indexable object is double mapped.
-	 * 
+	 *
 	 * @param extensions pointer to MM_GCExtensionsBase
 	 * @param arrayPtr  pointer to indexable object we are checking to see if it is double mapped
 	 * @return true if the indexable object is double mapped

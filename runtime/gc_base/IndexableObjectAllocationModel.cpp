@@ -545,14 +545,14 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 /* Double map is only supported on OSX and LINUX 64 bit Systems for now */
 #error "Platform not supported by Double Map API"
 #endif /* !((defined(LINUX) || defined(OSX)) && defined(J9VM_ENV_DATA64)) */
-void * 
+void *
 MM_IndexableObjectAllocationModel::doubleMapArraylets(MM_EnvironmentBase *env, J9Object *objectPtr, void **arrayletLeaveAddrs, MM_HeapRegionDescriptorVLHGC *firstLeafRegionDescriptor, void *preferredAddress)
 {
 	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env);
 	MM_Heap *heap = extensions->getHeap();
 	UDATA arrayletLeafSize = env->getOmrVM()->_arrayletLeafSize;
 	UDATA arrayletLeafCount = MM_Math::roundToCeiling(arrayletLeafSize, _dataSize) / arrayletLeafSize;
-	
+
 	/* Retrieve actual page size */
 	UDATA pageSize = heap->getPageSize();
 
