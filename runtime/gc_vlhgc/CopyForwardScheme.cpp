@@ -4073,31 +4073,29 @@ private:
 	virtual void doDoubleMappedObjectSlot(J9Object *objectPtr, struct J9PortVmemIdentifier *identifier) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
 		env->_copyForwardStats._doubleMappedOrVirtualLargeObjectHeapArrayletCandidates += 1;
+
 		if (!_copyForwardScheme->isLiveObject(objectPtr)) {
 			Assert_MM_true(_copyForwardScheme->isObjectInEvacuateMemory(objectPtr));
 			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
-			printf("CFS1A: objectPtr: %p , dataAddr: %p \n", objectPtr, dataAddr);
 			MM_ForwardedHeader forwardedHeader(objectPtr, _extensions->compressObjectReferences());
 			void *forwardedObject = forwardedHeader.getForwardedObject();
 			bool virtualLargeObjectHeapEnabled = _extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled();
+			
 			if (NULL == forwardedObject) {
 				Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
 				env->_copyForwardStats._doubleMappedOrVirtualLargeObjectHeapArrayletsCleared += 1;
 				OMRPORT_ACCESS_FROM_OMRVM(_omrVM);
+				/* If forwardedObject is NULL and virtualLargeObjectHeapEnabled is true, free the sparse region occupied by the data of the indexable object */
 				if (virtualLargeObjectHeapEnabled) {
-					printf("CFS2B: objectPtr: %p \n", objectPtr);
 					_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr);
 					_extensions->indexableObjectModel.setDataAddrForContiguous((J9IndexableObject *)objectPtr, NULL);
 				} else {
 					omrvmem_release_double_mapped_region(identifier->address, identifier->size, identifier);
 				}
 			} else if (virtualLargeObjectHeapEnabled && NULL != dataAddr) {
-				printf("CFS3: objectPtr: %p \n", objectPtr);
 				/* There might be the case that GC finds a floating arraylet, which was a result of an allocation
 				 * failure (reason why this GC cycle is happening). */ 
-				if (!_extensions->indexableObjectModel.isAddressWithinHeap(_extensions, dataAddr)) {
-					_extensions->largeObjectVirtualMemory->updateSparseDataEntryAfterObjectHasMoved(dataAddr, forwardedObject);
-				}
+				_extensions->largeObjectVirtualMemory->updateSparseDataEntryAfterObjectHasMoved(dataAddr, forwardedObject);
 			}
 			objectPtr = forwardedHeader.getForwardedObject();
 		}
@@ -4107,34 +4105,22 @@ private:
 	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
 		env->_copyForwardStats._doubleMappedOrVirtualLargeObjectHeapArrayletCandidates += 1;
+
 		if (!_copyForwardScheme->isLiveObject(objectPtr)) {
 			Assert_MM_true(_copyForwardScheme->isObjectInEvacuateMemory(objectPtr));
 			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
-			printf("CFS1A: objectPtr: %p , dataAddr: %p \n", objectPtr, dataAddr);
 			MM_ForwardedHeader forwardedHeader(objectPtr, _extensions->compressObjectReferences());
-			MM_SparseVirtualMemory *largeObjectVirtualMemory = _extensions->largeObjectVirtualMemory;
-
 			void *forwardedObject = forwardedHeader.getForwardedObject();
-			printf("CFS1B: objectPtr: %p \n", forwardedObject);
-			// TODO: Better way to fetch dataAddr?
-
+			/* If forwardedObject is NULL, free the sparse region occupied by the data of the indexable object */
 			if (NULL == forwardedObject) {
-				printf("CFS2A: objectPtr: %p \n", objectPtr);
 				Assert_MM_mustBeClass(_extensions->objectModel.getPreservedClass(&forwardedHeader));
 				env->_copyForwardStats._doubleMappedOrVirtualLargeObjectHeapArrayletsCleared += 1;
-				if (NULL != dataAddr) {
-					printf("CFS2B: objectPtr: %p \n", objectPtr);
-					largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr);
-					_extensions->indexableObjectModel.setDataAddrForContiguous((J9IndexableObject *)objectPtr, NULL);
-				}
+				_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr);
+				_extensions->indexableObjectModel.setDataAddrForContiguous((J9IndexableObject *)objectPtr, NULL);
 			} else if (NULL != dataAddr) {
-				printf("CFS3: forwardedObject: %p \n", forwardedObject);
 				/* There might be the case that GC finds a floating arraylet, which was a result of an allocation
-				 * failure (reason why this GC cycle is happening).
-				 * TODO: Should this be handled here or by sparse Heap? */
-				if (!_extensions->indexableObjectModel.isAddressWithinHeap(_extensions, dataAddr)) {
-					largeObjectVirtualMemory->updateSparseDataEntryAfterObjectHasMoved(dataAddr, forwardedObject);
-				}
+				 * failure (reason why this GC cycle is happening) */
+				_extensions->largeObjectVirtualMemory->updateSparseDataEntryAfterObjectHasMoved(dataAddr, forwardedObject);
 			}
 			objectPtr = forwardedHeader.getForwardedObject();
 		}
