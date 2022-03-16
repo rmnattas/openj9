@@ -102,10 +102,4 @@ class GCArrayletObjectModel_V1 extends GCArrayletObjectModelBase
 		UDATA totalFootprint = spineSize.add(externalArrayletSize);
 		return totalFootprint;
 	}
-
-	@Override
-	public boolean isCorrectDataAddrPointer(J9IndexableObjectPointer arrayPtr) throws CorruptDataException, NoSuchFieldException
-	{
-		return true;
-	}
 }

@@ -23,8 +23,6 @@ package com.ibm.j9ddr.vm29.j9.gc;
 
 import com.ibm.j9ddr.CorruptDataException;
 import com.ibm.j9ddr.vm29.pointer.generated.J9IndexableObjectPointer;
-import com.ibm.j9ddr.vm29.pointer.helper.J9IndexableObjectHelper;
-import com.ibm.j9ddr.vm29.pointer.VoidPointer;
 import com.ibm.j9ddr.vm29.types.UDATA;
 
 class GCArrayletObjectModel_V2 extends GCArrayletObjectModelBase
@@ -68,35 +66,5 @@ class GCArrayletObjectModel_V2 extends GCArrayletObjectModelBase
 		UDATA externalArrayletSize = externalArrayletsSize(arrayPtr);
 		UDATA totalFootprint = spineSize.add(externalArrayletSize);
 		return totalFootprint;
-	}
-
-	/**
-	 * @param arrayPtr array object who's data address validity we are checking
-	 * @throws CorruptDataException If there's a problem accessing the indexable object dataAddr field
-	 * @throws NoSuchFieldException If the indexable object dataAddr field does not exist on the build that generated the core file
-	 */
-	@Override
-	public boolean isCorrectDataAddrPointer(J9IndexableObjectPointer arrayPtr) throws CorruptDataException, NoSuchFieldException
-	{
-		boolean isCorrectDataAddrPointer = false;
-		UDATA dataSizeInBytes = getDataSizeInBytes(arrayPtr);
-		VoidPointer dataAddr = J9IndexableObjectHelper.getDataAddrForIndexable(arrayPtr);
-		boolean isValidDataAddrForDoubleMappedObject = isIndexableObjectDoubleMapped(dataAddr);
-
-		if (dataSizeInBytes.eq(0)) {
-			isCorrectDataAddrPointer = (0 == dataAddr.longValue());
-		} else if (dataSizeInBytes.lt(arrayletLeafSize)) {
-			isCorrectDataAddrPointer = dataAddr.equals(VoidPointer.cast(arrayPtr.addOffset(J9IndexableObjectHelper.contiguousHeaderSize())));
-		} else {
-			if (enableDoubleMapping) {
-				isCorrectDataAddrPointer = isValidDataAddrForDoubleMappedObject;
-			} else if (enableVirtualLargeObjectHeap) {
-				isCorrectDataAddrPointer = isValidDataAddrForDoubleMappedObject && VoidPointer.cast(arrayPtr.addOffset(J9IndexableObjectHelper.contiguousHeaderSize())).equals(getArrayoidPointer(arrayPtr));
-			} else {
-				isCorrectDataAddrPointer = (0 == dataAddr.longValue());
-			}
-		}
-
-		return isCorrectDataAddrPointer;
 	}
 }

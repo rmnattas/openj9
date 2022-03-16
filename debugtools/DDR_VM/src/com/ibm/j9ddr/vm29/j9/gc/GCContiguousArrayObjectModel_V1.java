@@ -101,10 +101,4 @@ class GCContiguousArrayObjectModel_V1 extends GCArrayObjectModel
 	public UDATA getTotalFootprintInBytesWithHeader(J9IndexableObjectPointer arrayPtr) throws CorruptDataException {
 		return getSizeInBytesWithHeader(arrayPtr);
 	}
-
-	@Override
-	public boolean isCorrectDataAddrPointer(J9IndexableObjectPointer arrayPtr) throws CorruptDataException, NoSuchFieldException
-	{
-		return true;
-	}
 }
