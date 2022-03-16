@@ -312,14 +312,4 @@ public abstract class GCObjectModel extends GCBase
 	{
 		return indexableObjectModel.isInlineContiguousArraylet(arrayPtr);
 	}
-
-	/**
-	 * @param arrayPtr array object who's data address validity we are checking
-	 * @throws CorruptDataException If there's a problem accessing the indexable object dataAddr field
-	 * @throws NoSuchFieldException If the indexable object dataAddr field does not exist on the build that generated the core file
-	 */
-	public boolean isCorrectDataAddrPointer(J9IndexableObjectPointer arrayPtr) throws CorruptDataException, NoSuchFieldException
-	{
-		return indexableObjectModel.isCorrectDataAddrPointer(arrayPtr);
-	}
 }
