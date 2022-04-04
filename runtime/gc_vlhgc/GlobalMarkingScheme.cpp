@@ -1362,7 +1362,7 @@ private:
 			if (_extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled()) {
 				void *dataAddr = _extensions->indexableObjectModel.getDataAddrForIndexableObject((J9IndexableObject *)objectPtr);
 				if (NULL != dataAddr) {
-					_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr);
+					_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr);
 					_extensions->indexableObjectModel.setDataAddrForContiguous((J9IndexableObject *)objectPtr, NULL);
 				}
 			} else {
@@ -1379,7 +1379,7 @@ private:
 			env->_markVLHGCStats._doubleMappedOrVirtualLargeObjectHeapArrayletsCleared += 1;
 			void *dataAddr = _extensions->indexableObjectModel.getDataAddrForContiguous((J9IndexableObject *)objectPtr);
 			if (NULL != dataAddr) {
-				_extensions->largeObjectVirtualMemory->freeSparseRegionForDataAndRemoveDataFromSparseDataPool(_env, dataAddr);
+				_extensions->largeObjectVirtualMemory->freeSparseRegionAndUnmapFromHeapObject(_env, dataAddr);
 				_extensions->indexableObjectModel.setDataAddrForContiguous((J9IndexableObject *)objectPtr, NULL);
 			}
 		}
