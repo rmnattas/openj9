@@ -169,23 +169,27 @@ MM_ConfigurationIncrementalGenerational::createHeapWithManager(MM_EnvironmentBas
 
 #if defined(J9VM_ENV_DATA64)
 	if (extensions->isVirtualLargeObjectHeapRequested) {
-		/* Create off-heap */
-		MM_SparseVirtualMemory *largeObjectVirtualMemory = MM_SparseVirtualMemory::newInstance(env, OMRMEM_CATEGORY_MM_RUNTIME_HEAP, heap);
-		if (NULL != largeObjectVirtualMemory) {
-			extensions->largeObjectVirtualMemory = largeObjectVirtualMemory;
-			extensions->indexableObjectModel.setEnableVirtualLargeObjectHeap(true);
-			extensions->isVirtualLargeObjectHeapEnabled = true;
-		} else {
-#if defined(OMR_GC_VLHGC_CONCURRENT_COPY_FORWARD)
-			extensions->heapRegionStateTable->kill(env->getForge());
-			extensions->heapRegionStateTable = NULL;
-#endif /* defined(OMR_GC_VLHGC_CONCURRENT_COPY_FORWARD) */
-			extensions->compressedCardTable->kill(env);
-			extensions->compressedCardTable = NULL;
-			extensions->cardTable->kill(env);
-			extensions->cardTable = NULL;
-			heap->kill(env);
-			return NULL;
+		uintptr_t pagesize = heap->getPageSize();
+		/* Before enabling off-heap allocation for large objects, ensure we are not using large pages or pages larger than arrayletLeafSize  */
+		if ((!extensions->memoryManager->isLargePage(env, pagesize)) || (pagesize <= extensions->getOmrVM()->_arrayletLeafSize)) {
+			/* Create off-heap */
+			MM_SparseVirtualMemory *largeObjectVirtualMemory = MM_SparseVirtualMemory::newInstance(env, OMRMEM_CATEGORY_MM_RUNTIME_HEAP, heap);
+			if (NULL != largeObjectVirtualMemory) {
+				extensions->largeObjectVirtualMemory = largeObjectVirtualMemory;
+				extensions->indexableObjectModel.setEnableVirtualLargeObjectHeap(true);
+				extensions->isVirtualLargeObjectHeapEnabled = true;
+			} else {
+	#if defined(OMR_GC_VLHGC_CONCURRENT_COPY_FORWARD)
+				extensions->heapRegionStateTable->kill(env->getForge());
+				extensions->heapRegionStateTable = NULL;
+	#endif /* defined(OMR_GC_VLHGC_CONCURRENT_COPY_FORWARD) */
+				extensions->compressedCardTable->kill(env);
+				extensions->compressedCardTable = NULL;
+				extensions->cardTable->kill(env);
+				extensions->cardTable = NULL;
+				heap->kill(env);
+				return NULL;
+			}
 		}
 	}
 #endif /* J9VM_ENV_DATA64 */
