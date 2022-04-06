@@ -107,8 +107,10 @@ MM_Heap *
 MM_ConfigurationRealtime::createHeapWithManager(MM_EnvironmentBase *env, uintptr_t heapBytesRequested, MM_HeapRegionManager *regionManager)
 {
         MM_GCExtensionsBase* extensions = env->getExtensions();
-        Assert_GC_true_with_message(env, false == extensions->isVirtualLargeObjectHeapRequested, "%s is not supported on metronome.\n", "-XX:enableVirtualLargeObjectHeap");
-        Assert_GC_true_with_message(env, false == extensions->isArrayletDoubleMapRequested, "%s is not supported on metronome.\n", "-Xgc:enableArrayletDoubleMapping");
+    	Assert_GC_true_with_message(env, false == extensions->isVirtualLargeObjectHeapRequested, "%s is not supported on metronome.\n", "-XX:enableVirtualLargeObjectHeap");
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+		Assert_GC_true_with_message(env, false == extensions->isArrayletDoubleMapRequested, "%s is not supported on metronome.\n", "-Xgc:enableArrayletDoubleMapping");
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 
         return MM_HeapVirtualMemory::newInstance(env, extensions->heapAlignment, heapBytesRequested, regionManager);
 }
