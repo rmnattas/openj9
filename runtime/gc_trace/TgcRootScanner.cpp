@@ -53,7 +53,6 @@ const static char *attributeNames[] = {
 	"stringtable", /* RootScannerEntity_StringTable */
 	"jniglobalrefs", /* RootScannerEntity_JNIGlobalReferences */
 	"jniweakglobalrefs", /* RootScannerEntity_JNIWeakGlobalReferences */
-	"doubleMappedOrVirtualLargeObjectHeapObjects", /* RootScannerEntity_DoubleMappedOrVirtualLargeObjectHeapObjects */
 	"debuggerrefs", /* RootScannerEntity_DebuggerReferences */
 	"debuggerclassrefs", /* RootScannerEntity_DebuggerClassReferences */
 	"monitorrefs", /* RootScannerEntity_MonitorReferences */
@@ -75,6 +74,7 @@ const static char *attributeNames[] = {
 	"monitorlookupcaches", /* RootScannerEntity_MonitorLookupCaches */
 	"monitorlookupcachescomplete", /* RootScannerEntity_MonitorLookupCachesComplete */
 	"monitorreferenceobjectscomplete", /* RootScannerEntity_MonitorReferenceObjectsComplete */
+	"doubleMappedOrVirtualLargeObjectHeapObjects", /* RootScannerEntity_DoubleMappedOrVirtualLargeObjectHeapObjects */
 };
 
 bool
