@@ -1269,11 +1269,14 @@ public:
 	MMINLINE void *
 	getDataPointerForContiguous(J9IndexableObject *arrayPtr)
 	{
+#if defined(J9VM_ENV_DATA64)
 		return compressObjectReferences()
 				? ((J9IndexableObjectContiguousCompressed *)arrayPtr)->dataAddr
 				: ((J9IndexableObjectContiguousFull *)arrayPtr)->dataAddr;
+#else /* J9VM_ENV_DATA64 */
+		return (void *)((uintptr_t)arrayPtr + contiguousHeaderSize());
+#endif /* J9VM_ENV_DATA64 */
 	}
-
 
 	/**
 	 * Returns the offset of the hashcode slot, in bytes, from the beginning of the header.
