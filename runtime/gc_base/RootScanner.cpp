@@ -939,6 +939,7 @@ MM_RootScanner::scanDoubleMappedObjects(MM_EnvironmentBase *env)
 }
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 
+#if defined(J9VM_ENV_DATA64)
 void
 MM_RootScanner::scanObjectsInVirtualLargeObjectHeap(MM_EnvironmentBase *env)
 {
@@ -956,6 +957,7 @@ MM_RootScanner::scanObjectsInVirtualLargeObjectHeap(MM_EnvironmentBase *env)
 		reportScanningEnded(RootScannerEntity_DoubleMappedOrVirtualLargeObjectHeapObjects);
 	}
 }
+#endif /* J9VM_ENV_DATA64 */
 
 /**
  * Scan all root set references from the VM into the heap.

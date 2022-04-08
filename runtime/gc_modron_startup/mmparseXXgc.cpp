@@ -1030,7 +1030,7 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			extensions->doFrequentObjectAllocationSampling = true;
 			continue;
 		}
-
+#if defined(J9VM_ENV_DATA64)
 		if (try_scan(&scan_start, "enableVirtualLargeObjectHeap")) {
 			extensions->isVirtualLargeObjectHeapRequested = true;
 			continue;
@@ -1040,6 +1040,7 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 			extensions->isVirtualLargeObjectHeapRequested = false;
 			continue;
 		}
+#endif /* defined(J9VM_ENV_DATA64) */
 
 		if (try_scan(&scan_start, "largeObjectAllocationProfilingThreshold=")) {
 			if (!scan_udata_helper(vm, &scan_start, &extensions->largeObjectAllocationProfilingThreshold, "largeObjectAllocationProfilingThreshold=")) {
