@@ -113,6 +113,7 @@ typedef struct J9IndexableObject* mm_j9array_t;
 		? (&(((elemType*)J9_CONVERT_POINTER_FROM_TOKEN_VM__(javaVM, ((U_32*)((J9IndexableObjectDiscontiguousCompressed *)array + 1))[((U_32)index)/((javaVM)->arrayletLeafSize/sizeof(elemType))]))[((U_32)index)%((javaVM)->arrayletLeafSize/sizeof(elemType))])) \
 		: (&(((elemType*)(((UDATA*)((J9IndexableObjectDiscontiguousFull *)array + 1))[((U_32)index)/((javaVM)->arrayletLeafSize/sizeof(elemType))]))[((U_32)index)%((javaVM)->arrayletLeafSize/sizeof(elemType))])))
 
+#if defined(J9VM_ENV_DATA64)
 #define J9JAVAARRAYCONTIGUOUS_EA(vmThread, array, index, elemType) \
 	(J9VMTHREAD_COMPRESS_OBJECT_REFERENCES(vmThread) \
 		? (&((elemType*)((((J9IndexableObjectContiguousCompressed *)(array))->dataAddr)))[(index)]) \
@@ -122,6 +123,20 @@ typedef struct J9IndexableObject* mm_j9array_t;
 	(J9JAVAVM_COMPRESS_OBJECT_REFERENCES(javaVM) \
 		? (&((elemType*)((((J9IndexableObjectContiguousCompressed *)(array))->dataAddr)))[(index)]) \
 		: (&((elemType*)((((J9IndexableObjectContiguousFull *)(array))->dataAddr)))[(index)]))
+
+#else /* J9VM_ENV_DATA64 */
+
+#define J9JAVAARRAYCONTIGUOUS_EA(vmThread, array, index, elemType) \
+	(J9VMTHREAD_COMPRESS_OBJECT_REFERENCES(vmThread) \
+		? (&((elemType*)((((J9IndexableObjectContiguousCompressed *)(array)) + 1)))[(index)]) \
+		: (&((elemType*)((((J9IndexableObjectContiguousFull *)(array)) + 1)))[(index)]))
+
+#define J9JAVAARRAYCONTIGUOUS_EA_VM(javaVM, array, index, elemType) \
+	(J9JAVAVM_COMPRESS_OBJECT_REFERENCES(javaVM) \
+		? (&((elemType*)((((J9IndexableObjectContiguousCompressed *)(array)) + 1)))[(index)]) \
+		: (&((elemType*)((((J9IndexableObjectContiguousFull *)(array)) + 1)))[(index)]))
+
+#endif /* J9VM_ENV_DATA64 */
 
 #define J9ISCONTIGUOUSARRAY(vmThread, array) \
 	(J9VMTHREAD_COMPRESS_OBJECT_REFERENCES(vmThread) \
