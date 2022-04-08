@@ -4102,6 +4102,7 @@ private:
 	}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 
+#if defined(J9VM_ENV_DATA64)
 	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
 		env->_copyForwardStats._doubleMappedOrVirtualLargeObjectHeapArrayletCandidates += 1;
@@ -4125,6 +4126,7 @@ private:
 			objectPtr = forwardedHeader.getForwardedObject();
 		}
 	}
+#endif /* J9VM_ENV_DATA64 */
 
 	/**
 	 * @Clear the string table cache slot if the object is not marked
