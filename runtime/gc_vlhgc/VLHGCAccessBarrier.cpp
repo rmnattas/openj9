@@ -311,7 +311,7 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 		MM_JNICriticalRegion::enterCriticalRegion(vmThread, true);
 		Assert_MM_true(vmThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS);
 		arrayObject = (J9IndexableObject*)J9_JNI_UNWRAP_REFERENCE(array);
-		data = (void *)indexableObjectModel->getDataAddrForContiguous(arrayObject);
+		data = (void *)indexableObjectModel->getDataPointerForContiguous(arrayObject);
 #if defined(J9VM_GC_MODRON_COMPACTION) || defined(J9VM_GC_MODRON_SCAVENGER)
 		/* we need to increment this region's critical count so that we know not to compact it */
 		UDATA volatile *criticalCount = &(((MM_HeapRegionDescriptorVLHGC *)_heap->getHeapRegionManager()->regionDescriptorForAddress(arrayObject))->_criticalRegionsInUse);
@@ -377,7 +377,7 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 		 * Objects can not be moved if critical section is active
 		 * This trace point will be generated if object has been moved or passed value of elems is corrupted
 		 */
-		void *data = (void *)indexableObjectModel->getDataAddrForContiguous(arrayObject);
+		void *data = (void *)indexableObjectModel->getDataPointerForContiguous(arrayObject);
 		if(elems != data) {
 			Trc_MM_JNIReleasePrimitiveArrayCritical_invalid(vmThread, arrayObject, elems, data);
 		}
@@ -451,7 +451,7 @@ MM_VLHGCAccessBarrier::jniGetStringCritical(J9VMThread* vmThread, jstring str, j
 		/* acquire access and return a direct pointer */
 		MM_JNICriticalRegion::enterCriticalRegion(vmThread, true);
 		Assert_MM_true(vmThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS);
-		data = (jchar*)_extensions->indexableObjectModel.getDataAddrForContiguous(valueObject);
+		data = (jchar*)_extensions->indexableObjectModel.getDataPointerForContiguous(valueObject);
 
 		if (NULL != isCopy) {
 			*isCopy = JNI_FALSE;
