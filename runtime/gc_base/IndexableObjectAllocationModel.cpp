@@ -175,6 +175,7 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 	/* Lay out arraylet and arrayoid pointers */
 	switch (_layout) {
 	case GC_ArrayletObjectModel::InlineContiguous:
+#if defined(J9VM_ENV_DATA64)
 		if (!isArrayletDataAdjacentToHeader) {
 			if (indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
 				/* We still need to create leaves for discontiguous arrays that will be allocated at off-heap */
@@ -193,9 +194,9 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 					Assert_MM_true(1 <= _numberOfArraylets);
 				}
 			}
-#endif
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 		}
-
+#endif /* J9VM_ENV_DATA64 */
 		if ((!isAllIndexableDataContiguousEnabled) || isArrayletDataAdjacentToHeader) {
 			Assert_MM_true(1 == _numberOfArraylets);
 		}
@@ -436,6 +437,7 @@ MM_IndexableObjectAllocationModel::reserveLeavesForContiguousArraylet(MM_Environ
 }
 #endif
 
+#if defined(J9VM_ENV_DATA64)
 MMINLINE J9IndexableObject *
 MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_EnvironmentBase *env, J9IndexableObject *spine)
 {
@@ -539,6 +541,7 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 
 	return spine;
 }
+#endif /* J9VM_ENV_DATA64 */
 
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 #if !((defined(LINUX) || defined(OSX)) && defined(J9VM_ENV_DATA64))
