@@ -187,10 +187,14 @@ GC_ArrayletObjectModel::isAddressWithinHeap(MM_GCExtensionsBase *extensions, voi
 bool
 GC_ArrayletObjectModel::isIndexableObjectDoubleMapped(MM_GCExtensionsBase *extensions, J9IndexableObject *arrayPtr)
 {
+#if defined(J9VM_ENV_DATA64)
 	void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
 	bool isObjectWithinHeap = isAddressWithinHeap(extensions, dataAddr);
-
 	return ((NULL != dataAddr) && (!isObjectWithinHeap));
+
+#else /* defined(J9VM_ENV_DATA64) */
+	return false;
+#endif /* defined(J9VM_ENV_DATA64) */
 }
 
 #if defined(J9VM_ENV_DATA64)
