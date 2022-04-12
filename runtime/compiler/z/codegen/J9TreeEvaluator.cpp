@@ -4684,6 +4684,9 @@ J9::Z::TreeEvaluator::multianewArrayEvaluator(TR::Node * node, TR::CodeGenerator
    TR::LabelSymbol *nonZeroFirstDimLabel = generateLabelSymbol(cg);
    TR::LabelSymbol *cFlowRegionDone = generateLabelSymbol(cg);
    TR::LabelSymbol *oolFailLabel = generateLabelSymbol(cg);
+#if defined(TR_TARGET_64BIT)
+   TR::LabelSymbol *populateFirstDimDataAddrSlot = generateLabelSymbol(cg);
+#endif /* TR_TARGET_64BIT */
 
 #if defined(TR_TARGET_64BIT)
    bool isIndexableDataAddrPresent = TR::Compiler->om.isIndexableDataAddrPresent();
