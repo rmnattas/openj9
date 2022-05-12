@@ -75,11 +75,14 @@ MM_IndexableObjectAllocationModel::initializeAllocateDescription(MM_EnvironmentB
 		break;
 
 	case GC_ArrayletObjectModel::InlineContiguous:
-		/* all good */
-		setAllocatable(true);
-		/* If we're dealing with camuflaged discontiguous we must call */
+		/* Check if we're dealing with a camouflaged discontiguous array - these arrays will require slow-path allocate */
 		if (isAllIndexableDataContiguousEnabled && (!extensions->indexableObjectModel.isArrayletDataAdjacentToHeader(_dataSize))) {
-			layoutSizeInBytes = _dataSize;
+			if (isGCAllowed()) {
+				layoutSizeInBytes = _dataSize;
+				setAllocatable(true);
+			}
+		} else {
+			setAllocatable(true);
 		}
 		break;
 
