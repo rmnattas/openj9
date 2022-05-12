@@ -2181,6 +2181,7 @@ TR_J9ByteCodeIlGenerator::calculateArrayElementAddress(TR::DataType dataType, bo
       push(index);
    }
 
+   static bool enableDataAddrFieldLoad = (feGetEnv("sverma_EnableDataAddrFieldLoad") != NULL);
    // Stack is now ...,aryRef,index<===
    if (comp()->generateArraylets())
       {
@@ -2216,43 +2217,21 @@ TR_J9ByteCodeIlGenerator::calculateArrayElementAddress(TR::DataType dataType, bo
       int32_t arrayletHeaderSize = 0;
       calculateElementAddressInContiguousArray(width, arrayletHeaderSize);
       }
+#if defined(TR_TARGET_64BIT)
+   else if (fej9()->vmThread()->javaVM->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(fej9()->vmThread()->javaVM)
+      || enableDataAddrFieldLoad)
+      {
+      traceMsg(comp(), "Walker.cpp:calculateArrayElementAddress: generating dataAddr load.\n");
+      // stack is now ...,aryRef,index<===
+      calculateElementAddressInContiguousArray(width);
+      // stack is now ...,firstArrayElement+index/shift<===
+      _stack->top()->setIsInternalPointer(true);
+      }
+#endif /* TR_TARGET_64BIT */
    else
       {
-#if defined(TR_TARGET_64BIT)
-      static bool disableDataAddrFieldLoad = (feGetEnv("TR_DisableDataAddrFieldLoad") != NULL);
-     /**
-      * Check for the following:
-      *     1. 64 bit?
-      *     2. Internal Pointers enabled?
-      *     3. Number of changes under limit?
-      *     4. Have we imposed a limit (-99 indicates unlimited changes)
-      * if any of the above checks fail we can not use the dataAddr field
-      * in the array header, thus revert to original implementation (spineCHKs)
-      */
-      if (disableDataAddrFieldLoad
-         && comp()->getOption(TR_DisableInternalPointers)
-         && _arrayChanges > comp()->getOptions()->getZZArrayModificationCounter()
-         && comp()->getOptions()->getZZArrayModificationCounter() != -99)
-         {
-         traceMsg(comp(), "\n** Not making any more modifications as _arrayChanges=%d\n", _arrayChanges);
-#endif /* TR_TARGET_64BIT */
-
-         int32_t arrayHeaderSize = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
-         calculateElementAddressInContiguousArray(width, arrayHeaderSize);
-#if defined(TR_TARGET_64BIT)
-         }
-      else
-         {
-         traceMsg(comp(), "Walker.cpp:calculateArrayElementAddress: creating contiguous-array-view.\n");
-
-         // Stack is now ...,aryRef,index<===
-         calculateElementAddressInContiguousArray(width);
-         // stack is now ...,firstArrayElement+index/shift<===
-         _arrayChanges++;
-
-         traceMsg(comp(), "\n ============================================================\n");
-         }
-#endif /* TR_TARGET_64BIT */
+      int32_t arrayHeaderSize = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
+      calculateElementAddressInContiguousArray(width, arrayHeaderSize);
       _stack->top()->setIsInternalPointer(true);
       }
 
