@@ -2182,9 +2182,29 @@ TR_J9ByteCodeIlGenerator::calculateArrayElementAddress(TR::DataType dataType, bo
    }
 
    static bool enableDataAddrFieldLoad = (feGetEnv("sverma_EnableDataAddrFieldLoad") != NULL);
+   static bool enablePrints = (feGetEnv("sverma_EnablePrints") != NULL);
    // Stack is now ...,aryRef,index<===
-   if (comp()->generateArraylets())
+#if defined(TR_TARGET_64BIT)
+   if (fej9()->vmThread()->javaVM->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(fej9()->vmThread()->javaVM)
+      || enableDataAddrFieldLoad)
       {
+      if (enablePrints)
+         printf("Walker.cpp:calculateArrayElementAddress: generating dataAddr load.\n");
+
+      // traceMsg(comp(), "Walker.cpp:calculateArrayElementAddress: generating dataAddr load.\n");
+      // stack is now ...,aryRef,index<===
+      calculateElementAddressInContiguousArray(width);
+      // stack is now ...,firstArrayElement+index/shift<===
+      _stack->top()->setIsInternalPointer(true);
+      }
+   else if (comp()->generateArraylets())
+#else
+   if (comp()->generateArraylets())
+#endif /* TR_TARGET_64BIT */
+      {
+      if (enablePrints)
+         printf("Arraylets are enabled.\n");
+
       // shift the index on the current stack to get index into array spine
       loadConstant(TR::iconst, fej9()->getArraySpineShift(width));
       genBinary(TR::ishr);
@@ -2217,19 +2237,11 @@ TR_J9ByteCodeIlGenerator::calculateArrayElementAddress(TR::DataType dataType, bo
       int32_t arrayletHeaderSize = 0;
       calculateElementAddressInContiguousArray(width, arrayletHeaderSize);
       }
-#if defined(TR_TARGET_64BIT)
-   else if (fej9()->vmThread()->javaVM->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(fej9()->vmThread()->javaVM)
-      || enableDataAddrFieldLoad)
-      {
-      traceMsg(comp(), "Walker.cpp:calculateArrayElementAddress: generating dataAddr load.\n");
-      // stack is now ...,aryRef,index<===
-      calculateElementAddressInContiguousArray(width);
-      // stack is now ...,firstArrayElement+index/shift<===
-      _stack->top()->setIsInternalPointer(true);
-      }
-#endif /* TR_TARGET_64BIT */
    else
       {
+      if (enablePrints)
+         printf("Walker.cpp:calculateArrayElementAddress: falling to else case.\n");
+
       int32_t arrayHeaderSize = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
       calculateElementAddressInContiguousArray(width, arrayHeaderSize);
       _stack->top()->setIsInternalPointer(true);
