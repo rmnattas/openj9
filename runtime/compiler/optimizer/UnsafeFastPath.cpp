@@ -912,35 +912,35 @@ int32_t TR_UnsafeFastPath::perform()
                }
             else
                {
-               TR::Node *addrCalc = NULL;
+               TR::Node *addrCalc = J9::TransformUtil::calculateElementAddress(comp(), base, index, offset);
 
                // TODO: call J9::TransformUtil::calculateElementAddress
                // TODO: Should we be setting addrCalc as internal pointer?
-               // Calculate element address
+//                // Calculate element address
 
-               TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp()->fe());
-               J9JavaVM *vm = fej9->vmThread()->javaVM;
-               bool isOffHeapAllocationEnabled = vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm);
+//                TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp()->fe());
+//                J9JavaVM *vm = fej9->vmThread()->javaVM;
+//                bool isOffHeapAllocationEnabled = vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm);
 
-#if defined(TR_TARGET_64BIT)
-               if (isArrayOperation && comp()->target().is64Bit() && isOffHeapAllocationEnabled)
-                  {
-                  TR::SymbolReference *dataAddrFieldOffset = comp()->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(fej9->getOffsetOfContiguousDataAddrField());
-                  TR::Node *baseNodeForAdd = TR::Node::createWithSymRef(TR::aloadi, 1, base, 0, dataAddrFieldOffset);
-                  baseNodeForAdd->setIsDataAddrPointer(true);
-                  TR::Node *newOffset = TR::Node::create(TR::ladd, 2, offset, TR::Node::lconst(-16));
+// #if defined(TR_TARGET_64BIT)
+//                if (isArrayOperation && comp()->target().is64Bit() && isOffHeapAllocationEnabled)
+//                   {
+//                   TR::SymbolReference *dataAddrFieldOffset = comp()->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(fej9->getOffsetOfContiguousDataAddrField());
+//                   TR::Node *baseNodeForAdd = TR::Node::createWithSymRef(TR::aloadi, 1, base, 0, dataAddrFieldOffset);
+//                   baseNodeForAdd->setIsDataAddrPointer(true);
+//                   TR::Node *newOffset = TR::Node::create(TR::ladd, 2, offset, TR::Node::lconst(-16));
 
-                  addrCalc = TR::Node::create(TR::aladd, 2, baseNodeForAdd, newOffset);
-                  }
-               else if (comp()->target().is64Bit())
-#else
-               if (comp()->target().is64Bit())
-#endif /* TR_TARGET_64BIT */
-                  addrCalc = TR::Node::create(TR::aladd, 2, base, offset);
-               else
-                  addrCalc = TR::Node::create(TR::aiadd, 2, base, TR::Node::create(TR::l2i, 1, offset));
+//                   addrCalc = TR::Node::create(TR::aladd, 2, baseNodeForAdd, newOffset);
+//                   }
+//                else if (comp()->target().is64Bit())
+// #else
+//                if (comp()->target().is64Bit())
+// #endif /* TR_TARGET_64BIT */
+//                   addrCalc = TR::Node::create(TR::aladd, 2, base, offset);
+//                else
+//                   addrCalc = TR::Node::create(TR::aiadd, 2, base, TR::Node::create(TR::l2i, 1, offset));
 
-               addrCalc->setIsInternalPointer(true);
+               // addrCalc->setIsInternalPointer(true);
 
                if (value)
                   {
