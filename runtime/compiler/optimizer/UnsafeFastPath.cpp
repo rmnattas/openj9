@@ -720,6 +720,8 @@ int32_t TR_UnsafeFastPath::perform()
                traceMsg(comp(), "VarHandle operation: isArrayOperation %d type %s value %p isVolatile %d on node %p\n", isArrayOperation, J9::DataType::getName(type), value, isVolatile, node);
             }
 
+         TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp()->fe());
+         bool isOffHeapAllocationEnabled = fej9->vmThread()->javaVM->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(fej9->vmThread()->javaVM);
          bool mightBeArraylets = isArrayOperation && TR::Compiler->om.canGenerateArraylets();
 
          // Skip inlining of helpers for arraylets if unsafe for arraylets is disabled
@@ -795,19 +797,20 @@ int32_t TR_UnsafeFastPath::perform()
                offset->setIsNonNegative(true);
 
                // Index is not used in the non-arraylet case so no need to compute it
-               if (mightBeArraylets)
+               if (mightBeArraylets && !isOffHeapAllocationEnabled)
                   index = J9::TransformUtil::calculateIndexFromOffsetInContiguousArray(comp(), offset, type);
                }
 
             prepareToReplaceNode(node);
 
-            if (mightBeArraylets)
+            if (mightBeArraylets && !isOffHeapAllocationEnabled)
                {
                if (trace())
                   traceMsg(comp(), "This is an array operation in arraylets mode with array [" POINTER_PRINTF_FORMAT "] and offset [ " POINTER_PRINTF_FORMAT "], creating a load/store and a spineCHK\n", object, offset);
 
                TR::Node *addrCalc = NULL;
 
+               // TODO: can we call same api to generate addrCalc
                // Calculate element address
                if (comp()->target().is64Bit())
                   addrCalc = TR::Node::create(TR::aladd, 2, base, offset);
@@ -911,11 +914,33 @@ int32_t TR_UnsafeFastPath::perform()
                {
                TR::Node *addrCalc = NULL;
 
+               // TODO: call J9::TransformUtil::calculateElementAddress
+               // TODO: Should we be setting addrCalc as internal pointer?
                // Calculate element address
+
+               TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp()->fe());
+               J9JavaVM *vm = fej9->vmThread()->javaVM;
+               bool isOffHeapAllocationEnabled = vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm);
+
+#if defined(TR_TARGET_64BIT)
+               if (isArrayOperation && comp()->target().is64Bit() && isOffHeapAllocationEnabled)
+                  {
+                  TR::SymbolReference *dataAddrFieldOffset = comp()->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(fej9->getOffsetOfContiguousDataAddrField());
+                  TR::Node *baseNodeForAdd = TR::Node::createWithSymRef(TR::aloadi, 1, base, 0, dataAddrFieldOffset);
+                  baseNodeForAdd->setIsDataAddrPointer(true);
+                  TR::Node *newOffset = TR::Node::create(TR::ladd, 2, offset, TR::Node::lconst(-16));
+
+                  addrCalc = TR::Node::create(TR::aladd, 2, baseNodeForAdd, newOffset);
+                  }
+               else if (comp()->target().is64Bit())
+#else
                if (comp()->target().is64Bit())
+#endif /* TR_TARGET_64BIT */
                   addrCalc = TR::Node::create(TR::aladd, 2, base, offset);
                else
                   addrCalc = TR::Node::create(TR::aiadd, 2, base, TR::Node::create(TR::l2i, 1, offset));
+
+               addrCalc->setIsInternalPointer(true);
 
                if (value)
                   {
