@@ -228,6 +228,7 @@ public:
     */
    static TR::Node *calculateOffsetFromIndexInContiguousArrayWithElementStride(TR::Compilation *, TR::Node * index, int32_t elementStride);
    static TR::Node *calculateElementAddress(TR::Compilation *, TR::Node *array, TR::Node * index, TR::DataType type);
+   static TR::Node *calculateElementAddressWithIndex(TR::Compilation *, TR::Node *array, TR::Node * index, TR::DataType type);
    static TR::Node *calculateElementAddressWithElementStride(TR::Compilation *, TR::Node *array, TR::Node * index, int32_t elementStride);
    static TR::Node *calculateIndexFromOffsetInContiguousArray(TR::Compilation *, TR::Node * offset, TR::DataType type);
 
