@@ -2030,7 +2030,7 @@ MM_CopyForwardScheme::copy(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 					shouldUpdateDataAddress = shouldUpdateDataAddress && !indexableObjectModel->isDoubleMappingEnabled();
 #endif
-					if (shouldUpdateDataAddress || !indexableObjectModel->isIndexableObjectDoubleMapped(_extensions, (J9IndexableObject *)destinationObjectPtr)) {
+					if (shouldUpdateDataAddress ||  ((NULL != _extensions->indexableObjectModel.getDataAddrForIndexableObject((J9IndexableObject *)destinationObjectPtr)) && (!indexableObjectModel->isIndexableObjectDoubleMapped(_extensions, (J9IndexableObject *)destinationObjectPtr)))) {
 						/* Updates internal data address of indexable objects. Every indexable object have a void *dataAddr
 						 * that always points to the array data. It will always point to the address right after the header,
 						 * in case of contiguous data it will point to the data itself, and in case of discontiguous
