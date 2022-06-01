@@ -153,7 +153,7 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 	if (NULL != spine) {
 		/* Set the array size */
 		if (getAllocateDescription()->isChunkedArray()) {
-			indexableObjectModel->setSizeInElementsForDiscontiguous(spine, 0);
+			indexableObjectModel->setSizeInElementsForDiscontiguous(spine, _numberOfIndexedFields);
 #if defined(J9VM_ENV_DATA64)
 			indexableObjectModel->setDataAddrForDiscontiguous(spine, NULL);
 #endif /* J9VM_ENV_DATA64 */
@@ -166,7 +166,6 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 				indexableObjectModel->setDataAddrForContiguous(spine);
 #endif /* J9VM_ENV_DATA64 */
 			} else if (isAllIndexableDataContiguousEnabled) {
-				indexableObjectModel->setSizeInElementsForContiguous(spine, 0);
 #if defined(J9VM_ENV_DATA64)
 				indexableObjectModel->setDataAddrForContiguous(spine, NULL);
 #endif /* J9VM_ENV_DATA */
@@ -184,7 +183,6 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 				/* We still need to create leaves for discontiguous arrays that will be allocated at off-heap */
 				spine = getSparseAddressAndDecommitLeaves(env, spine);
 				if (NULL != spine) {
-					indexableObjectModel->setSizeInElementsForContiguous(spine, _numberOfIndexedFields);
 					Assert_MM_true(1 <= _numberOfArraylets);
 				}
 			}
@@ -193,7 +191,6 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 				/* We still need to create leaves for discontiguous arrays that will be double mapped so that we reserve the appropriate regions in the heap */
 				spine = reserveLeavesForContiguousArraylet(env, spine);
 				if (NULL != spine) {
-					indexableObjectModel->setSizeInElementsForContiguous(spine, _numberOfIndexedFields);
 					Assert_MM_true(1 <= _numberOfArraylets);
 				}
 			}
@@ -502,12 +499,13 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 		}
 #endif /* J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION */
 
+		/* refresh the spine -- it might move if we GC while allocating the leaf */
+		spine = _allocateDescription.getSpine();
+
 		bytesRemaining -= OMR_MIN(bytesRemaining, arrayletLeafSize);
 		arrayoidIndex += 1;
 	}
 
-	/* refresh the spine -- it might move if we GC while allocating the leaf */
-	spine = _allocateDescription.getSpine();
 
 	if ((NULL != spine)
 	#if defined(J9VM_GC_DOUBLE_MAPPING_FOR_SPARSE_HEAP_ALLOCATION)
