@@ -3185,8 +3185,7 @@ modifyDllLoadTable(J9JavaVM * vm, J9Pool* loadTable, J9VMInitArgs* j9vm_args)
 	 * -Xjit can co-exist with -Xnoaot and -Xaot, but overrides the others.
 	 * -Xint overrides everything.
 	 */
-	xjit = xnojit = xnoaot = xaot = FALSE;
-	xint = TRUE;
+	xint = xjit = xnojit = xnoaot = xaot = FALSE;
 	for (i=(vm_args->nOptions - 1); i>=0 ; i--) {
 		testString = getOptionString(j9vm_args, i);				/* may return mapped value */
 
