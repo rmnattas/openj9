@@ -657,9 +657,27 @@ J9::ObjectModel::getAddressOfElement(TR::Compilation* comp, uintptr_t objectPoin
    TR_ASSERT(offset >= TR::Compiler->om.contiguousArrayHeaderSizeInBytes() &&
              offset < TR::Compiler->om.getArrayLengthInBytes(comp, objectPointer) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), "Array is out of bound");
 
+   J9JavaVM *vm = TR::Compiler->javaVM;
+   bool isOffHeapAllocationEnabled = vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm);
+
+   // TODO: Can we add some sort of assert here for next time array header layout changes?
    // If the array is contiguous, return the addition of objectPointer and offset
+   uintptr_t base = objectPointer;
    if (!TR::Compiler->om.isDiscontiguousArray(comp, objectPointer))
-      return objectPointer + offset;
+      {
+#if defined(TR_TARGET_64BIT)
+      if (isOffHeapAllocationEnabled)
+         {
+         /* If off heap allocation is enabled the data portion of
+         * a contiguous array can be off heap. Hence, we can not
+         * rely on objectPointer + header + offset to retrieve
+         * the element; we must do dataAddr pointer + offset
+         */
+         base = *(uintptr_t *)(objectPointer + TR::Compiler->om.offsetOfContiguousDataAddrField());
+         }
+#endif /* TR_TARGET_64BIT */
+      return (uintptr_t)(base + offset);
+      }
 
    // The following code handles discontiguous array
    //
