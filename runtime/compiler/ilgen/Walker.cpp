@@ -1883,9 +1883,7 @@ TR_J9ByteCodeIlGenerator::genArrayBoundsCheck(TR::Node * offset, int32_t width)
    bool canSkipThisNullCheck = false;
    bool canSkipArrayLengthCalc = false;
    int32_t firstDimension = -1;
-   bool isOffHeapAllocationEnabled = fej9()->vmThread()->javaVM->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(fej9()->vmThread()->javaVM);
 
-   // TODO: does checking if off heap alocation is enabled matter here?
    if (_classInfo)
       {
       if (!_classInfo->getFieldInfo())
@@ -1907,12 +1905,9 @@ TR_J9ByteCodeIlGenerator::genArrayBoundsCheck(TR::Node * offset, int32_t width)
              * When hybrid arraylets are used, simplification based on the arraylength can only
              * be done if the arraylength fits within a single region.  Otherwise, a spine check
              * is still required.
-             * TODO: update description to include off heap allocation.
              */
 
-            if (isOffHeapAllocationEnabled ||
-               !TR::Compiler->om.useHybridArraylets() ||
-               !TR::Compiler->om.isDiscontiguousArray(firstDimension, width))
+            if (!TR::Compiler->om.useHybridArraylets() || !TR::Compiler->om.isDiscontiguousArray(firstDimension, width))
                {
                if (performTransformation(comp(), "O^O CLASS LOOKAHEAD: Can skip array length calculation for array %p based on class file examination\n", baseArray))
                   canSkipArrayLengthCalc = true;
@@ -1925,9 +1920,7 @@ TR_J9ByteCodeIlGenerator::genArrayBoundsCheck(TR::Node * offset, int32_t width)
                 offset->getDataType() == TR::Int32 &&
                 offset->getInt() < firstDimension &&
                 offset->getInt() >= 0 &&
-                (isOffHeapAllocationEnabled ||
-                  !TR::Compiler->om.useHybridArraylets() ||
-                  !TR::Compiler->om.isDiscontiguousArray(firstDimension, width)))
+                (!TR::Compiler->om.useHybridArraylets() || !TR::Compiler->om.isDiscontiguousArray(firstDimension, width)))
                {
                if (performTransformation(comp(), "O^O CLASS LOOKAHEAD: Can skip bound check for access %p using array %p which has length %d based on class file examination\n", offset, baseArray, firstDimension))
                   canSkipThisBoundCheck = true;
@@ -1936,15 +1929,12 @@ TR_J9ByteCodeIlGenerator::genArrayBoundsCheck(TR::Node * offset, int32_t width)
          }
       }
 
-   if ((comp()->requiresSpineChecks() && !isOffHeapAllocationEnabled)
-      || (!_methodSymbol->skipBoundChecks() && !canSkipThisBoundCheck))
+   if (comp()->requiresSpineChecks() || (!_methodSymbol->skipBoundChecks() && !canSkipThisBoundCheck))
       {
       TR::Node *arrayLength = 0;
       if (!canSkipArrayLengthCalc)
          {
-         // TODO_sverma: Do we need to check both. If spine checks are required we aren't
-         //              using off heap technology.
-         genArrayLength(comp()->requiresSpineChecks() || !isOffHeapAllocationEnabled);
+         genArrayLength(comp()->requiresSpineChecks());
 
          arrayLength = pop();
          if (arrayLength->getOpCode().isArrayLength())
@@ -1956,9 +1946,7 @@ TR_J9ByteCodeIlGenerator::genArrayBoundsCheck(TR::Node * offset, int32_t width)
          arrayLength = TR::Node::create(TR::iconst, 0, firstDimension);
          }
 
-      if (comp()->requiresSpineChecks()
-         && !_suppressSpineChecks
-         && !isOffHeapAllocationEnabled)
+      if (comp()->requiresSpineChecks() && !_suppressSpineChecks)
          {
          // Create an incomplete check node that will be populated when all the children
          // are known.  It must be created here to be sure it is anchored in the right spot.
@@ -1991,20 +1979,11 @@ TR_J9ByteCodeIlGenerator::genArrayBoundsCheck(TR::Node * offset, int32_t width)
          TR_J9ByteCodeIteratorWithState::pop();
          }
 
-      // TODO: why do we check if spine check is required here, because
-      //       if they were required we would have entered the if block
       // Create an incomplete check node that will be populated when all the children
       // are known.  It must be created here to be sure it is anchored in the right spot.
       //
-      if (comp()->requiresSpineChecks()
-         && !_suppressSpineChecks
-         && !isOffHeapAllocationEnabled)
+      if (comp()->requiresSpineChecks() && !_suppressSpineChecks)
          {
-         /* TODO:
-            - [ ] What purpose does this serve?
-            - [ ] Would simply checking if off heap allocation is enabled suffice?.
-            - [ ] What node structure is expected upon return?
-         */
          TR::Node *spineChk = TR::Node::create(TR::SpineCHK, 3, offset);
          genTreeTop(spineChk);
          push(spineChk);
