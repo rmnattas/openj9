@@ -5994,16 +5994,11 @@ TR_J9ByteCodeIlGenerator::loadArrayElement(TR::DataType dataType, TR::ILOpCodes 
    // we won't have flattening, so no call to flattenable array element access
    // helper is needed.
    //
-   static bool enablePrints = (feGetEnv("sverma_EnablePrints") != NULL);
-   bool isOffHeapAllocationEnabled = fej9()->vmThread()->javaVM->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(fej9()->vmThread()->javaVM);
-
-   // TODO_sverma: we don't need to check both arraylets and isOffHeapAllocationEnabled
    if (mayBeValueType &&
        TR::Compiler->om.areValueTypesEnabled() &&
        TR::Compiler->om.isValueTypeArrayFlatteningEnabled() &&
        !TR::Compiler->om.canGenerateArraylets() &&
-       dataType == TR::Address &&
-       !isOffHeapAllocationEnabled)
+       dataType == TR::Address)
       {
       TR::Node* elementIndex = pop();
       TR::Node* arrayBaseAddress = pop();
@@ -6015,7 +6010,6 @@ TR_J9ByteCodeIlGenerator::loadArrayElement(TR::DataType dataType, TR::ILOpCodes 
          }
       auto* helperSymRef = comp()->getSymRefTab()->findOrCreateLoadFlattenableArrayElementNonHelperSymbolRef();
       auto* helperCallNode = TR::Node::createWithSymRef(TR::acall, 2, 2, elementIndex, arrayBaseAddress, helperSymRef);
-      // TODO: should we flatten loads when using dataAddr element?
 
       TR::TreeTop *loadHelperCallTT = genTreeTop(helperCallNode);
 
@@ -6028,9 +6022,6 @@ TR_J9ByteCodeIlGenerator::loadArrayElement(TR::DataType dataType, TR::ILOpCodes 
       }
 
    traceMsg(comp(), "In loadArrayElement\n");
-   if (enablePrints)
-      printf("In loadArrayElement\n");
-
    bool genSpineChecks = comp()->requiresSpineChecks();
 
    _suppressSpineChecks = false;
@@ -6049,9 +6040,7 @@ TR_J9ByteCodeIlGenerator::loadArrayElement(TR::DataType dataType, TR::ILOpCodes 
    //
    TR::Node *checkNode = NULL;
 
-   if (genSpineChecks
-      && !isOffHeapAllocationEnabled
-      && !_stack->isEmpty())
+   if (genSpineChecks && !_stack->isEmpty())
       {
       if (_stack->top()->getOpCode().isSpineCheck())
          {
@@ -6076,7 +6065,6 @@ TR_J9ByteCodeIlGenerator::loadArrayElement(TR::DataType dataType, TR::ILOpCodes 
          }
       }
 
-   // checkNode will be null if isOffHeapAllocationEnabled is true
    if (checkNode)
       {
       if (checkNode->getOpCode().isBndCheck())
