@@ -7512,19 +7512,17 @@ TR_J9ByteCodeIlGenerator::storeAuto(TR::DataType type, int32_t slot, bool isAdju
 void
 TR_J9ByteCodeIlGenerator::storeArrayElement(TR::DataType dataType, TR::ILOpCodes nodeop, bool checks)
    {
-   bool isOffHeapAllocationEnabled = fej9()->vmThread()->javaVM->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(fej9()->vmThread()->javaVM);
    traceMsg(comp(), "In storeArrayElement\n");
    TR::Node * value = pop();
 
    handlePendingPushSaveSideEffects(value);
 
-   // TODO: should we enable this for off heap allocated arrays?
    // Value types prototype for flattened array elements does not yet support
    // GC policies that allow arraylets.  If arraylets are required, assume
    // we won't have flattening, so no call to flattenable array element access
    // helper is needed.
    //
-   if (TR::Compiler->om.areValueTypesEnabled() && !TR::Compiler->om.canGenerateArraylets() && dataType == TR::Address && !isOffHeapAllocationEnabled)
+   if (TR::Compiler->om.areValueTypesEnabled() && !TR::Compiler->om.canGenerateArraylets() && dataType == TR::Address)
       {
       TR::Node* elementIndex = pop();
       TR::Node* arrayBaseAddress = pop();
@@ -7575,9 +7573,7 @@ TR_J9ByteCodeIlGenerator::storeArrayElement(TR::DataType dataType, TR::ILOpCodes
    //
    TR::Node *checkNode = NULL;
 
-   if (genSpineChecks &&
-      !isOffHeapAllocationEnabled &&
-      !_stack->isEmpty())
+   if (genSpineChecks && !_stack->isEmpty())
       {
       if (_stack->top()->getOpCode().isSpineCheck())
          {
