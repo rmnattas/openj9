@@ -9610,6 +9610,7 @@ static TR::Register* inlineIntrinsicIndexOf(TR::Node* node, TR::CodeGenerator* c
 static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGenerator* cg)
    {
    TR::Compilation *comp = cg->comp();
+   TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp->fe());
 
    TR_ASSERT(!TR::Compiler->om.canGenerateArraylets() || node->isUnsafeGetPutCASCallOnNonArray(), "This evaluator does not support arraylets.");
 
@@ -9619,15 +9620,74 @@ static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGe
    TR::Node* oldValueNode = node->getChild(3);
    TR::Node* newValueNode = node->getChild(4);
 
-   TR::Register* object   = cg->evaluate(objectNode);
-   TR::Register* offset   = cg->evaluate(offsetNode);
-   TR::Register* oldValue = cg->evaluate(oldValueNode);
-   TR::Register* newValue = cg->evaluate(newValueNode);
-   TR::Register* result   = cg->allocateRegister();
-   TR::Register* EAX      = cg->allocateRegister();
-   TR::Register* tmp      = cg->allocateRegister();
+   TR::Register* object           = cg->evaluate(objectNode);
+   // evaluation of offset is determined by if we are dealing with an array operation or not
+   TR::Register* offset           = NULL;
+   TR::Register* oldValue         = cg->evaluate(oldValueNode);
+   TR::Register* newValue         = cg->evaluate(newValueNode);
+   TR::Register* result           = cg->allocateRegister();
+   TR::Register* EAX              = cg->allocateRegister();
+   TR::Register* tmp              = cg->allocateRegister();
+   TR::Register* firstDataElement = NULL;
+
+   TR::ResolvedMethodSymbol *methodSymbol = comp->getMethodSymbol();
+   bool isArrayOperation = false;
+   // Check for array operation
+   switch (methodSymbol->getRecognizedMethod())
+      {
+      case TR::java_util_concurrent_ConcurrentHashMap_casTabAt:
+         isArrayOperation = true;
+      default:
+         break;
+      }
 
    bool use64BitClasses = comp->target().is64Bit() && !comp->useCompressedPointers();
+
+   TR::MemoryReference *objectFieldMR = NULL;
+#if defined(TR_TARGET_64BIT)
+   if (isArrayOperation && fej9->isOffHeapAllocationEnabled())
+      {
+      TR::Node *lshl = offsetNode->getFirstChild();
+      TR::Node *i2l = lshl->getFirstChild();
+      TR::Node *iRegLoad = i2l->getFirstChild();
+
+      if (offsetNode->getReferenceCount() == 1
+         && lshl->getReferenceCount() == 1
+         && i2l->getReferenceCount() == 1
+         && iRegLoad->getReferenceCount() == 1
+         && lshl->getSecondChild()->getReferenceCount() == 1
+         && offsetNode->getSecondChild()->getReferenceCount() == 1)
+         {
+         /* Since it is an array operation we are probably deaing with
+          * n1 ladd
+          * n2   lshl
+          * n3     i2l
+          * n4        ==>iRegLoad ; actual offset
+          * n5     iload  java/util/concurrent/ConcurrentHashMap.ASHIFT I
+          * n6   lload  java/util/concurrent/ConcurrentHashMap.ABASE J
+          *
+          * we can get away by evaluating just n2
+          */
+         offset = cg->evaluate(lshl);
+         firstDataElement = cg->allocateRegister();
+
+         TR::MemoryReference *dataAddrSlotMR = generateX86MemoryReference(object, fej9->getOffsetOfContiguousDataAddrField(), cg);
+         // load dataAddr field into a reg
+         generateRegMemInstruction(TR::InstOpCode::LRegMem(), node, firstDataElement, dataAddrSlotMR, cg);
+         // create memory refernce the normal way using dataAddr pointer as base
+         objectFieldMR = generateX86MemoryReference(firstDataElement, offset, 0, cg);
+
+         // Decrement refernce counts, this would have been done during
+         // evaluation of offsetNode.
+         cg->recursivelyDecReferenceCount(offsetNode->getSecondChild());
+         }
+      }
+   else
+#endif /* TR_TARGET_64BIT */
+      {
+      offset = cg->evaluate(offsetNode);
+      objectFieldMR = generateX86MemoryReference(object, offset, 0, cg);
+      }
 
    if (comp->target().is32Bit())
       {
@@ -9641,13 +9701,13 @@ static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGe
       case gc_modron_readbar_none:
          break;
       case gc_modron_readbar_always:
-         generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, tmp, generateX86MemoryReference(object, offset, 0, cg), cg);
+         generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, tmp, objectFieldMR, cg);
          generateMemRegInstruction(TR::InstOpCode::SMemReg(), node, generateX86MemoryReference(cg->getVMThreadRegister(), offsetof(J9VMThread, floatTemp1), cg), tmp, cg);
          generateHelperCallInstruction(node, TR_softwareReadBarrier, NULL, cg);
          break;
       case gc_modron_readbar_range_check:
          {
-         generateRegMemInstruction(TR::InstOpCode::LRegMem(use64BitClasses), node, tmp, generateX86MemoryReference(object, offset, 0, cg), cg);
+         generateRegMemInstruction(TR::InstOpCode::LRegMem(use64BitClasses), node, tmp, objectFieldMR, cg);
 
          TR::LabelSymbol* begLabel = generateLabelSymbol(cg);
          TR::LabelSymbol* endLabel = generateLabelSymbol(cg);
@@ -9668,7 +9728,7 @@ static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGe
          TR_OutlinedInstructionsGenerator og(rdbarLabel, node, cg);
          generateRegMemInstruction(TR::InstOpCode::CMPRegMem(use64BitClasses), node, tmp, generateX86MemoryReference(cg->getVMThreadRegister(), comp->fej9()->thisThreadGetEvacuateTopAddressOffset(), cg), cg);
          generateLabelInstruction(TR::InstOpCode::JA4, node, endLabel, cg);
-         generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, tmp, generateX86MemoryReference(object, offset, 0, cg), cg);
+         generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, tmp, objectFieldMR, cg);
          generateMemRegInstruction(TR::InstOpCode::SMemReg(), node, generateX86MemoryReference(cg->getVMThreadRegister(), offsetof(J9VMThread, floatTemp1), cg), tmp, cg);
          generateHelperCallInstruction(node, TR_softwareReadBarrier, NULL, cg);
          generateLabelInstruction(TR::InstOpCode::JMP4, node, endLabel, cg);
@@ -9702,7 +9762,7 @@ static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGe
    TR::RegisterDependencyConditions* deps = generateRegisterDependencyConditions((uint8_t)1, 1, cg);
    deps->addPreCondition(EAX, TR::RealRegister::eax, cg);
    deps->addPostCondition(EAX, TR::RealRegister::eax, cg);
-   generateMemRegInstruction(use64BitClasses ? TR::InstOpCode::LCMPXCHG8MemReg : TR::InstOpCode::LCMPXCHG4MemReg, node, generateX86MemoryReference(object, offset, 0, cg), tmp, deps, cg);
+   generateMemRegInstruction(use64BitClasses ? TR::InstOpCode::LCMPXCHG8MemReg : TR::InstOpCode::LCMPXCHG4MemReg, node, objectFieldMR, tmp, deps, cg);
    generateRegInstruction(TR::InstOpCode::SETE1Reg, node, result, cg);
    generateRegRegInstruction(TR::InstOpCode::MOVZXReg4Reg1, node, result, result, cg);
 
@@ -9711,6 +9771,9 @@ static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGe
    // penalize general runtime performance especially if it is still correct to do
    // a write barrier even if the store never actually happened.
    TR::TreeEvaluator::VMwrtbarWithoutStoreEvaluator(node, objectNode, newValueNode, NULL, cg->generateScratchRegisterManager(), cg);
+
+   if (firstDataElement)
+      cg->stopUsingRegister(firstDataElement);
 
    cg->stopUsingRegister(tmp);
    cg->stopUsingRegister(EAX);
