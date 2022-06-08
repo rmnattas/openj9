@@ -360,7 +360,16 @@ J9::ObjectModel::maxContiguousArraySizeInBytes()
 bool
 J9::ObjectModel::isDiscontiguousArray(int32_t sizeInBytes)
    {
-   if (sizeInBytes > TR::Compiler->om.maxContiguousArraySizeInBytes())
+   J9JavaVM *vm = TR::Compiler->javaVM;
+   /* When off heap allocation is enabled both large and small arrays are
+    * allocated as contiguous. Only different among the two is that large
+    * arrays are contiguous off heap and small arrays are contiguous on
+    * heap. Hence, in addition to array size we must check if off heap
+    * allocation is enabled.
+    */
+   if (vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm))
+      return false;
+   else if (sizeInBytes > TR::Compiler->om.maxContiguousArraySizeInBytes())
       return true;
    else
       {
@@ -380,7 +389,16 @@ J9::ObjectModel::isDiscontiguousArray(int32_t sizeInElements, int32_t elementSiz
    int32_t shift = trailingZeroes(elementSize);
    int32_t maxContiguousArraySizeInElements = TR::Compiler->om.maxContiguousArraySizeInBytes() >> shift;
 
-   if (sizeInElements > maxContiguousArraySizeInElements)
+   J9JavaVM *vm = TR::Compiler->javaVM;
+   /* When off heap allocation is enabled both large and small arrays are
+    * allocated as contiguous. Only different among the two is that large
+    * arrays are contiguous off heap and small arrays are contiguous on
+    * heap. Hence, in addition to array size we must check if off heap
+    * allocation is enabled.
+    */
+   if (vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm))
+      return false;
+   else if (sizeInElements > maxContiguousArraySizeInElements)
       return true;
    else
       {
@@ -600,8 +618,15 @@ J9::ObjectModel::isDiscontiguousArray(TR::Compilation* comp, uintptr_t objectPoi
 
    int32_t length = *(int32_t*)(objectPointer + TR::Compiler->om.offsetOfContiguousArraySizeField());
 
-   if (TR::Compiler->om.canGenerateArraylets()
-       && length == 0)
+   J9JavaVM *vm = TR::Compiler->javaVM;
+   /* When off heap allocation is enabled, both large and small arrays are
+    * allocated as contiguous. Only different among the two is that large
+    * arrays are contiguous off heap and small arrays are contiguous on
+    * heap.
+    */
+   if (vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm))
+      return false;
+   else if (TR::Compiler->om.canGenerateArraylets() && length == 0)
       return true;
 
    return false;
