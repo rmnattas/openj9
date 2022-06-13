@@ -1004,10 +1004,10 @@ public:
 	 * @return if the dataAddr field of the indexable object is correct
 	 */
 	MMINLINE bool
-	isCorrectDataAddr(J9IndexableObject *arrayPtr, bool isValidDataAddrForDoubleMappedObject)
+	isValidDataAddr(J9IndexableObject *arrayPtr, bool isValidDataAddrForDoubleMappedObject)
 	{
 		void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
-		return isCorrectDataAddr(arrayPtr, dataAddr, isValidDataAddrForDoubleMappedObject);
+		return isValidDataAddr(arrayPtr, dataAddr, isValidDataAddrForDoubleMappedObject);
 	}
 
 	/**
@@ -1018,25 +1018,25 @@ public:
 	 * @return if the dataAddr field of the indexable object is correct
 	 */
 	MMINLINE bool
-	isCorrectDataAddr(J9IndexableObject *arrayPtr, void *dataAddr, bool isValidDataAddrForDoubleMappedObject)
+	isValidDataAddr(J9IndexableObject *arrayPtr, void *dataAddr, bool isValidDataAddrForDoubleMappedObject)
 	{
-		bool isCorrectDataAddr = false;
+		bool isValidDataAddr = false;
 		uintptr_t dataSizeInBytes = getDataSizeInBytes(arrayPtr);
 
 		if (0 == dataSizeInBytes) {
-			isCorrectDataAddr = (dataAddr == NULL);
+			isValidDataAddr = (dataAddr == NULL);
 		} else if (dataSizeInBytes < _omrVM->_arrayletLeafSize) {
-			isCorrectDataAddr = (dataAddr == (void *)((uintptr_t)arrayPtr + contiguousHeaderSize()));
+			isValidDataAddr = (dataAddr == (void *)((uintptr_t)arrayPtr + contiguousHeaderSize()));
 		} else {
 			if (isVirtualLargeObjectHeapEnabled()) { 
-				isCorrectDataAddr = isValidDataAddrForDoubleMappedObject;
+				isValidDataAddr = isValidDataAddrForDoubleMappedObject;
 			} else if (isDoubleMappingEnabled()) {
-				isCorrectDataAddr = isValidDataAddrForDoubleMappedObject && ((void *)((uintptr_t)arrayPtr + contiguousHeaderSize()) == getArrayoidPointer(arrayPtr));
+				isValidDataAddr = isValidDataAddrForDoubleMappedObject && ((void *)((uintptr_t)arrayPtr + contiguousHeaderSize()) == getArrayoidPointer(arrayPtr));
 			} else {
-				isCorrectDataAddr = (dataAddr == NULL);
+				isValidDataAddr = (dataAddr == NULL);
 			}
 		}
-		return isCorrectDataAddr;
+		return isValidDataAddr;
 	}
 #endif /* J9VM_ENV_DATA64 */
 

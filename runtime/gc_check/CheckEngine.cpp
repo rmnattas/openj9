@@ -466,11 +466,11 @@ GC_CheckEngine::checkJ9Object(J9JavaVM *javaVM, J9Object* objectPtr, J9MM_Iterat
 	if (OMR_ARE_ANY_BITS_SET(_cycle->getMiscFlags(), J9MODRON_GCCHK_VALID_INDEXABLE_DATA_ADDRESS) && extensions->objectModel.isIndexable(objectPtr)) {
 		/* Check that the indexable object has the correct data address pointer */
 		void *dataAddr = extensions->indexableObjectModel.getDataAddrForIndexableObject((J9IndexableObject*)objectPtr);
-		bool isValidDataAddrForDoubleMappedObject = (extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled() && extensions->largeObjectVirtualMemory->getSparseDataPool()->isValidDataPtr(dataAddr));
+		bool isValidDataAddr = (extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled() && extensions->largeObjectVirtualMemory->getSparseDataPool()->isValidDataPtr(dataAddr));
 		#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-		isValidDataAddrForDoubleMappedObject = isValidDataAddrForDoubleMappedObject || extensions->indexableObjectModel.isIndexableObjectDoubleMapped(extensions, (J9IndexableObject*)objectPtr);
+		isValidDataAddr = isValidDataAddr || extensions->indexableObjectModel.isIndexableObjectDoubleMapped(extensions, (J9IndexableObject*)objectPtr);
 		#endif
-		if (!extensions->indexableObjectModel.isCorrectDataAddr((J9IndexableObject*)objectPtr, dataAddr, isValidDataAddrForDoubleMappedObject)) {
+		if (!extensions->indexableObjectModel.isValidDataAddr((J9IndexableObject*)objectPtr, dataAddr, isValidDataAddr)) {
 			return J9MODRON_GCCHK_RC_INVALID_INDEXABLE_DATA_ADDRESS;
 		}
 	}
