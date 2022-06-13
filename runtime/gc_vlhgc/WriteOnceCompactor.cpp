@@ -1381,15 +1381,14 @@ MM_WriteOnceCompactor::fixupPointerArrayObject(MM_EnvironmentVLHGC* env, J9Objec
 	_extensions->classLoaderRememberedSet->rememberInstance(env, objectPtr);
 
 	/* arraylet leaves are walked separately in fixupArrayletLeafRegionContentsAndObjectLists(), to increase parallelism. Just walk the spine */
-	GC_ArrayletObjectModel::ArrayLayout layout = _extensions->indexableObjectModel.getArrayLayout((J9IndexableObject*)objectPtr);
+	GC_ArrayObjectModel* indexableObjectModel = &_extensions->indexableObjectModel;
+	GC_ArrayletObjectModel::ArrayLayout layout = indexableObjectModel->getArrayLayout((J9IndexableObject*)objectPtr);
+	 
 		
 	if (GC_ArrayletObjectModel::InlineContiguous == layout) {
-		if ((_extensions->indexableObjectModel.isArrayletDataAdjacentToHeader((J9IndexableObject*)objectPtr))
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-			|| (!_extensions->indexableObjectModel.isDoubleMappingEnabled())
-#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-			) {
-			UDATA elementsToWalk = _extensions->indexableObjectModel.getSizeInElements((J9IndexableObject*)objectPtr);
+		//Note: For offheap we need a special check for the case of a partially offheap allocated array that caused the current GC (its dataAddr field will still be NULL), with offheap heap we will fixup camouflaged discontiguous arrays) - DM, like default balanced, wants to fixup only truly contiguous arrays
+		if (indexableObjectModel->isArrayletDataAdjacentToHeader((J9IndexableObject*)objectPtr) || (indexableObjectModel->isVirtualLargeObjectHeapEnabled() && (NULL != indexableObjectModel->getDataAddrForContiguous((J9IndexableObject*)objectPtr)))) {
+			UDATA elementsToWalk = indexableObjectModel->getSizeInElements((J9IndexableObject*)objectPtr);
 			GC_PointerArrayIterator it(_javaVM, objectPtr);
 			UDATA previous = 0;
 			for (UDATA i = 0; i < elementsToWalk; i++) {
@@ -1411,14 +1410,14 @@ MM_WriteOnceCompactor::fixupPointerArrayObject(MM_EnvironmentVLHGC* env, J9Objec
 	} else if (GC_ArrayletObjectModel::Discontiguous == layout) {
 		/* do nothing - no inline pointers */
 	} else if (GC_ArrayletObjectModel::Hybrid == layout) {
-		UDATA numArraylets = _extensions->indexableObjectModel.numArraylets((J9IndexableObject*)objectPtr);
+		UDATA numArraylets = indexableObjectModel->numArraylets((J9IndexableObject*)objectPtr);
 		/* hybrid layouts always have at least one arraylet pointer in any configuration */
 		Assert_MM_true(numArraylets > 0);
 		/* ensure that the array has been initialized */
 		if (NULL != GC_PointerArrayIterator(_javaVM, objectPtr).nextSlot()) {
 			/* find the size of the inline component of the spine */
-			UDATA totalElementCount = _extensions->indexableObjectModel.getSizeInElements((J9IndexableObject*)objectPtr);
-			UDATA externalArrayletCount = _extensions->indexableObjectModel.numExternalArraylets((J9IndexableObject*)objectPtr);
+			UDATA totalElementCount = indexableObjectModel->getSizeInElements((J9IndexableObject*)objectPtr);
+			UDATA externalArrayletCount = indexableObjectModel->numExternalArraylets((J9IndexableObject*)objectPtr);
 			UDATA fullLeafSizeInBytes = _javaVM->arrayletLeafSize;
 			UDATA elementsPerFullLeaf = fullLeafSizeInBytes / referenceSize;
 			UDATA elementsToWalk = totalElementCount - (externalArrayletCount * elementsPerFullLeaf);
