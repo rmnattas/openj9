@@ -470,7 +470,7 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 	uintptr_t arrayoidIndex = 0;
 	Trc_MM_getSparseAddressAndDecommitLeaves_Entry(env->getLanguageVMThread(), spine, (void *)bytesRemaining, arrayletLeafCount, (void *)arrayletLeafSize);
 	while (0 < bytesRemaining) {
-		/* allocate the next arraylet leaf */
+		/* allocate the next arraylet leaf - leaves are allocated solely for the purpose of decommitting the memory later on in this function */
 		void *leaf = env->_objectAllocationInterface->allocateArrayletLeaf(env, &_allocateDescription,
 				_allocateDescription.getMemorySpace(), true);
 
