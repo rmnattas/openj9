@@ -2026,11 +2026,11 @@ MM_CopyForwardScheme::copy(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *
 
 					/* If double mapping is enabled and the indexable object has been double mapped, there's no need to update the data pointer;
 					 * however, if either one of these statements is false than we must update it, because data pointer points to data within heap. */
-					bool shouldUpdateDataAddress = !indexableObjectModel->isVirtualLargeObjectHeapEnabled();
+					bool shouldFixupDataAddr = !indexableObjectModel->isVirtualLargeObjectHeapEnabled();
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-					shouldUpdateDataAddress = shouldUpdateDataAddress && !indexableObjectModel->isDoubleMappingEnabled();
+					shouldFixupDataAddr = shouldFixupDataAddr && !indexableObjectModel->isDoubleMappingEnabled();
 #endif
-					if (shouldUpdateDataAddress ||  ((NULL != _extensions->indexableObjectModel.getDataAddrForIndexableObject((J9IndexableObject *)destinationObjectPtr)) && (!indexableObjectModel->isIndexableObjectDoubleMapped(_extensions, (J9IndexableObject *)destinationObjectPtr)))) {
+					if (shouldFixupDataAddr ||  indexableObjectModel->shouldFixupDataAddr(_extensions, (J9IndexableObject *)destinationObjectPtr)) {
 						/* Updates internal data address of indexable objects. Every indexable object have a void *dataAddr
 						 * that always points to the array data. It will always point to the address right after the header,
 						 * in case of contiguous data it will point to the data itself, and in case of discontiguous

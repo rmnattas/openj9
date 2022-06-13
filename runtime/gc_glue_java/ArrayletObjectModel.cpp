@@ -197,6 +197,18 @@ GC_ArrayletObjectModel::isIndexableObjectDoubleMapped(MM_GCExtensionsBase *exten
 #endif /* defined(J9VM_ENV_DATA64) */
 }
 
+bool
+GC_ArrayletObjectModel::shouldFixupDataAddr(MM_GCExtensionsBase *extensions, J9IndexableObject *arrayPtr)
+{
+#if defined(J9VM_ENV_DATA64)
+	void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
+	return isAddressWithinHeap(extensions, dataAddr);
+
+#else /* defined(J9VM_ENV_DATA64) */
+	return false;
+#endif /* defined(J9VM_ENV_DATA64) */
+}
+
 #if defined(J9VM_ENV_DATA64)
 void
 GC_ArrayletObjectModel::AssertArrayPtrIsIndexable(J9IndexableObject *arrayPtr)

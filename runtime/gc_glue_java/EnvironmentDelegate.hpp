@@ -219,11 +219,11 @@ public:
 		if (_extensions->objectModel.isIndexable(destinationObjectPtr)) {
 			/* If double mapping is enabled and the indexable object has been double mapped, there's no need to update the data pointer;
 			 * however, if either one of these statements is false than we must update it, because data pointer points to data within heap. */
-			bool shouldUpdateDataAddress = !indexableObjectModel->isVirtualLargeObjectHeapEnabled();
+			bool shouldFixupDataAddr = !indexableObjectModel->isVirtualLargeObjectHeapEnabled();
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-			shouldUpdateDataAddress = shouldUpdateDataAddress && !indexableObjectModel->isDoubleMappingEnabled();
+			shouldFixupDataAddr = shouldFixupDataAddr && !indexableObjectModel->isDoubleMappingEnabled();
 #endif
-			if (shouldUpdateDataAddress || !indexableObjectModel->isIndexableObjectDoubleMapped(_extensions, (J9IndexableObject *)destinationObjectPtr)) {
+			if (shouldFixupDataAddr || indexableObjectModel->shouldFixupDataAddr(_extensions, (J9IndexableObject *)destinationObjectPtr)) {
 				/* Updates internal field of indexable objects. Every indexable object have an extra field
 				 * that can be used to store any extra information about the indexable object. One use case is
 				 * OpenJ9 where we use this field to point to array data. In this case it will always point to

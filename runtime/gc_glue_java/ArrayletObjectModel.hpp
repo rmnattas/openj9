@@ -1361,6 +1361,15 @@ public:
 	bool isIndexableObjectDoubleMapped(MM_GCExtensionsBase *extensions, J9IndexableObject *arrayPtr);
 
 	/**
+	 * Check if the data address for the indexable object should be fixed up.
+	 *
+	 * @param extensions pointer to MM_GCExtensionsBase
+	 * @param arrayPtr  pointer to indexable object we are checking the data address
+	 * @return true if we should fixup the data address of the indexable object
+	 */
+	bool shouldFixupDataAddr(MM_GCExtensionsBase *extensions, J9IndexableObject *arrayPtr);
+
+	/**
 	 * Initialize the receiver, a new instance of GC_ObjectModel
 	 * 
 	 * @return true on success, false on failure
