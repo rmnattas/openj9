@@ -409,12 +409,12 @@ MM_IndexableObjectAllocationModel::reserveLeavesForContiguousArraylet(MM_Environ
 			firstLeafRegionDescriptor = (MM_HeapRegionDescriptorVLHGC *)extensions->getHeap()->getHeapRegionManager()->tableDescriptorForAddress(leaf);
 		}
 
+		/* refresh the spine -- it might move if we GC while allocating the leaf */
+		spine = _allocateDescription.getSpine();
+
 		bytesRemaining -= OMR_MIN(bytesRemaining, arrayletLeafSize);
 		arrayoidIndex += 1;
 	}
-
-	/* refresh the spine -- it might move if we GC while allocating the leaf */
-	spine = _allocateDescription.getSpine();
 
 	if ((NULL != spine) && (NULL != firstLeafRegionDescriptor)) {
 		Assert_MM_true(_layout == GC_ArrayletObjectModel::InlineContiguous);
