@@ -637,14 +637,13 @@ J9::ObjectModel::getAddressOfElement(TR::Compilation* comp, uintptr_t objectPoin
    {
    TR_ASSERT(TR::Compiler->vm.hasAccess(comp), "getAddressOfElement requires VM access");
    TR_ASSERT(TR::Compiler->cls.isClassArray(comp, TR::Compiler->cls.objectClass(comp, (objectPointer))), "Object is not an array");
-   TR_ASSERT(offset >= TR::Compiler->om.contiguousArrayHeaderSizeInBytes() &&
-             offset < TR::Compiler->om.getArrayLengthInBytes(comp, objectPointer) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), "Array is out of bound");
+   TR_ASSERT(offset >= 0 && offset < TR::Compiler->om.getArrayLengthInBytes(comp, objectPointer), "Array is out of bound");
 
    J9JavaVM *vm = TR::Compiler->javaVM;
    bool isOffHeapAllocationEnabled = vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm);
 
    // If the array is contiguous, return the addition of objectPointer and offset
-   int64_t offsetCorrection = 0;
+   int64_t totalOffset = offset;
    uintptr_t base = objectPointer;
    if (!TR::Compiler->om.isDiscontiguousArray(comp, objectPointer))
       {
@@ -657,19 +656,21 @@ J9::ObjectModel::getAddressOfElement(TR::Compilation* comp, uintptr_t objectPoin
           * the element, where offset is ((index << 2) + header_size).
           * Hence, we must do dataAddr ptr + offset - offsetCorrection.
           */
-         // sverma: we subtract array header here because the callsite might add it
          base = *(uintptr_t *)(objectPointer + TR::Compiler->om.offsetOfContiguousDataAddrField());
-         offsetCorrection = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
          }
+      else
 #endif /* TR_TARGET_64BIT */
-      return (uintptr_t)(base + offset - offsetCorrection);
+         {
+         totalOffset = offset + static_cast<int64_t>(TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+         }
+      return (uintptr_t)(base + totalOffset);
       }
 
    // The following code handles discontiguous array
    //
    // Treat the array as a byte array, so the element size is 1
    uintptr_t elementSize = 1;
-   int64_t elementIndex = offset - TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
+   int64_t elementIndex = totalOffset;
 
    uintptr_t leafIndex = comp->fej9()->getArrayletLeafIndex(elementIndex, elementSize);
    uintptr_t elementIndexInLeaf = comp->fej9()->getLeafElementIndex(elementIndex, elementSize);
