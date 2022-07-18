@@ -89,6 +89,165 @@ J9::TransformUtil::generateArrayElementShiftAmountTrees(
    return shiftAmount;
    }
 
+#if defined(TR_TARGET_64BIT)
+TR::Node *
+J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *arrayObject)
+   {
+   TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp->fe());
+   J9JavaVM *vm = fej9->vmThread()->javaVM;
+   TR_ASSERT_FATAL_WITH_NODE(arrayObject
+      , vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm)
+      , "Off heap allocation is expected to be enabled but wasn't.\n");
+
+   TR::SymbolReference *dataAddrFieldOffset = comp->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(fej9->getOffsetOfContiguousDataAddrField());
+   TR::Node *dataAddrField = TR::Node::createWithSymRef(TR::aloadi, 1, arrayObject, 0, dataAddrFieldOffset);
+   dataAddrField->setIsDataAddrPointer(true);
+
+   return dataAddrField;
+   }
+#endif /* TR_TARGET_64BIT */
+
+TR::Node *
+J9::TransformUtil::generateArrayAddressTrees(TR::Compilation *comp, TR::Node *arrayNode, TR::Node *offsetNode)
+   {
+   TR::Node *arrayAddressNode = NULL;
+   TR::Node *totalOffsetNode = NULL;
+
+   // TODO_sverma: Add support for subtracting or adding offsetNode and header size
+   //    Reference: https://github.com/eclipse-openj9/openj9/blob/master/runtime/compiler/optimizer/IdiomRecognitionUtils.cpp#L916
+   TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp->fe());
+   J9JavaVM *vm = fej9->vmThread()->javaVM;
+   bool isOffHeapAllocationEnabled = vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm);
+#if defined(TR_TARGET_64BIT)
+   if (isOffHeapAllocationEnabled)
+      {
+      arrayAddressNode = generateDataAddrLoadTrees(comp, arrayNode);
+      if (offsetNode)
+         arrayAddressNode = TR::Node::create(TR::aladd, 2, arrayAddressNode, offsetNode);
+      }
+   else if (comp->target().is64Bit())
+#else
+   if (comp->target().is64Bit())
+#endif /* TR_TARGET_64BIT */
+      {
+      totalOffsetNode = TR::Node::lconst(TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+      if (offsetNode)
+         totalOffsetNode = TR::Node::create(TR::ladd, 2, offsetNode, totalOffsetNode);
+      arrayAddressNode = TR::Node::create(TR::aladd, 2, arrayNode, totalOffsetNode);
+      }
+   else
+      {
+      totalOffsetNode = TR::Node::iconst(TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+      if (offsetNode)
+         totalOffsetNode = TR::Node::create(TR::iadd, 2, offsetNode, totalOffsetNode);
+      arrayAddressNode = TR::Node::create(TR::aiadd, 2, arrayNode, totalOffsetNode);
+      }
+
+   return arrayAddressNode;
+   }
+
+TR::Node *
+J9::TransformUtil::generateArrayStartTrees(TR::Compilation *comp, TR::Node *arrayObject)
+   {
+   TR::Node *firstArrayElementNode = generateArrayAddressTrees(comp, arrayObject);
+   return firstArrayElementNode;
+   }
+
+TR::Node *
+J9::TransformUtil::generateArrayOffsetTrees(TR::Compilation *comp, TR::Node *indexNode, TR::Node *strideNode, int32_t elementSize, bool useShiftOpCode)
+   {
+   TR::Node *offsetNode = indexNode->convertStoreDirectToLoadWithI2LIfNeeded();
+
+   if (strideNode != NULL || elementSize > 1)
+      {
+      TR::Node *newStrideNode = NULL;
+      if (strideNode)
+         newStrideNode = strideNode->convertStoreDirectToLoadWithI2LIfNeeded();
+
+      TR::ILOpCodes offsetOpCode = TR::BadILOp;
+      if (comp->target().is64Bit())
+         {
+         if (newStrideNode == NULL && elementSize > 1)
+            newStrideNode = TR::Node::lconst(indexNode, elementSize);
+
+         offsetOpCode = useShiftOpCode ? TR::lshl : TR::lmul;
+         }
+      else
+         {
+         if (newStrideNode == NULL && elementSize > 1)
+            newStrideNode = TR::Node::iconst(indexNode, elementSize);
+
+         offsetOpCode = useShiftOpCode ? TR::ishl : TR::imul;
+         }
+      offsetNode = TR::Node::create(offsetOpCode, 2, offsetNode, newStrideNode);
+      }
+
+   return offsetNode;
+   }
+
+TR::Node *
+J9::TransformUtil::findArrayIndexNode(TR::Compilation *comp, TR::Node *loadNode)
+   {
+   TR_ASSERT_FATAL_WITH_NODE(loadNode, loadNode->getOpCode().isLoadIndirect(), "Node must be an indirect load.");
+   /* Expected tree structure for contiguous arrays
+      indirect_load
+         aladd
+            array_base (array object pointer or data address pointer)
+            add
+               shift | multiply (offset)
+                  i2l
+                     index
+                  const stride
+               const array_header (only when off heap allocation is disabled)
+      */
+
+   TR::Node *alddNode = loadNode->getFirstChild();
+   TR::Node *indexNode = NULL;
+   if (alddNode->getFirstChild()->isDataAddrPointer()
+      || alddNode->getSecondChild()->getOpCode().isLoadConst())
+      {
+      indexNode = alddNode->getSecondChild();
+      }
+   else
+      {
+      indexNode = alddNode->getSecondChild()->getFirstChild();
+      }
+
+   // if (indexNode->getOpCode().isAdd())
+   //    {
+   //    // This has been commented out because I am not sure if it's better to return the top index
+   //    // node or return the i2l index node.
+
+   //    TR::Node *shiftNode = indexNode->getFirstChild();
+   //    if (shiftNode->getOpCode().isConversion() || shiftNode->getOpCode().isMul() || shiftNode->getOpCode().isSub())
+   //       indexNode = shiftNode->getFirstChild()->getFirstChild();
+   //    else
+   //       indexNode = shiftNode->getFirstChild();
+   //    }
+
+   return indexNode;
+   }
+
+TR::Node *
+J9::TransformUtil::findArrayBaseNode(TR::Compilation *comp, TR::Node *loadNode)
+   {
+   TR_ASSERT_FATAL_WITH_NODE(loadNode, loadNode->getOpCode().isLoadIndirect(), "Node must be an indirect load.");
+   TR::Node *aladdNode = loadNode->getFirstChild();
+   TR::Node *arrayBaseNode = aladdNode->getFirstChild();
+   /* Expected tree structure for continguous arrays when
+      using dataAddr field
+      aloadi
+         aladd
+            aloadi (dataAddrPointer)
+                  aload arrayObject
+            offset
+      */
+   if (arrayBaseNode->isDataAddrPointer())
+      arrayBaseNode = arrayBaseNode->getFirstChild();
+
+   return arrayBaseNode;
+   }
+
 //
 // A few predicates describing shadow symbols that we can reason about at
 // compile time.  Note that "final field" here doesn't rule out a pointer to a
