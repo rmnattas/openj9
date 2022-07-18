@@ -160,6 +160,12 @@ class OMR_EXTENSIBLE TreeEvaluator: public J9::TreeEvaluator
    static TR::Register *stringCaseConversionHelper(TR::Node *node, TR::CodeGenerator *cg, CaseConversionManager& manager);
 
    private:
+   static uintptr_t canUseArrayHeaderToAccessArrayData(
+      TR::CodeGenerator *cg,
+      TR::Node *node,
+      TR::Register *arrayObjectReg,
+      TR::Register *firstArrayElementReg);
+
    static TR::Register* performHeapLoadWithReadBarrier(TR::Node* node, TR::CodeGenerator* cg);
    };
 

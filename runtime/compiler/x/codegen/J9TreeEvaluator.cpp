@@ -13560,3 +13560,28 @@ TR::Register *J9::X86::TreeEvaluator::awrtbarEvaluator(TR::Node *node, TR::CodeG
    // counts of the children evaluated here and let this helper handle it.
    return TR::TreeEvaluator::writeBarrierEvaluator(node, cg);
    }
+
+/**
+ * If off heap allocation is enabled load data start
+ * address into arrayObjectReg and return headerSize = 0.
+ * If it isn't, return
+ * headerSize = contiguousArrayHeaderSizeInBytes.
+ */
+uintptr_t
+J9::X86::TreeEvaluator::canUseArrayHeaderToAccessArrayData(TR::CodeGenerator *cg, TR::Node *node, TR::Register *arrayObjectReg, TR::Register *firstArrayElementReg)
+   {
+   TR_J9VMBase *fej9 = (TR_J9VMBase *)(cg->fe());
+   uintptr_t headerSize = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
+
+#ifdef TR_TARGET_64BIT
+   if (fej9->isOffHeapAllocationEnabled())
+      {
+      TR::MemoryReference *dataAddrSlotMR = generateX86MemoryReference(arrayObjectReg, fej9->getOffsetOfContiguousDataAddrField(), cg);
+      // load address of the first element
+      generateRegMemInstruction(TR::InstOpCode::LRegMem(), node, firstArrayElementReg, dataAddrSlotMR, cg);
+      headerSize = 0;
+      }
+#endif /* TR_TARGET_64BIT */
+
+   return headerSize;
+   }
