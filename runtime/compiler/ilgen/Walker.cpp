@@ -6757,7 +6757,7 @@ TR_J9ByteCodeIlGenerator::genNewArray(int32_t typeIndex)
 
       TR::Node *sizeNode = node->getFirstChild();
       int32_t elementSize = TR::Compiler->om.getSizeOfArrayElement(node);
-      TR::Node *sizeInBytes = TR::TransformUtil::generateOffsetNode(comp(), sizeNode, NULL, elementSize);
+      TR::Node *sizeInBytes = TR::TransformUtil::generateArrayOffsetTrees(comp(), sizeNode, NULL, elementSize);
 
       TR::Node* constValNode = TR::Node::bconst(node, (int8_t)0);
       TR::Node *arraysetNode = TR::Node::create(TR::arrayset, 3, arrayRefNode, constValNode, sizeInBytes);
