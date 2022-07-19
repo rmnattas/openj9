@@ -2080,9 +2080,7 @@ TR_J9ByteCodeIlGenerator::calculateElementAddressInContiguousArray(int32_t width
    TR::Node* arrayBase = pop();
 
    traceMsg(comp(), "walker.cpp:createContiguousArrayView: entering method.\n");
-   TR::SymbolReference *dataAddrFieldOffset = symRefTab()->findOrCreateGenericIntShadowSymbolReference(fej9()->getOffsetOfContiguousDataAddrField());
-   TR::Node *firstArrayElementAddress = TR::Node::createWithSymRef(TR::aloadi, 1, arrayBase, 0, dataAddrFieldOffset);
-   firstArrayElementAddress->setIsDataAddrPointer(true);
+   TR::Node *firstArrayElementAddress = TR::TransformUtil::generateDataAddrLoadTrees(comp(), arrayBase);
    push(firstArrayElementAddress);
    push(index);
 
@@ -2245,6 +2243,7 @@ TR_J9ByteCodeIlGenerator::calculateArrayElementAddress(TR::DataType dataType, bo
       if (enablePrints)
          printf("Walker.cpp:calculateArrayElementAddress: falling to else case.\n");
 
+      // TODO_sverma: We can combine this with off heap allocation case.
       int32_t arrayHeaderSize = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
       calculateElementAddressInContiguousArray(width, arrayHeaderSize);
       _stack->top()->setIsInternalPointer(true);
@@ -6768,40 +6767,14 @@ TR_J9ByteCodeIlGenerator::genNewArray(int32_t typeIndex)
       {
       node->setCanSkipZeroInitialization(true);
 
-      TR::Node *arrayRefNode;
-      int32_t hdrSize = (int32_t) TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
-      bool is64BitTarget = comp()->target().is64Bit();
-
-      if (is64BitTarget)
-         {
-         TR::Node *constantNode = TR::Node::create(node, TR::lconst);
-         constantNode->setLongInt((int64_t)hdrSize);
-         arrayRefNode = TR::Node::create(TR::aladd, 2, node, constantNode);
-         }
-      else
-         arrayRefNode = TR::Node::create(TR::aiadd, 2, node, TR::Node::create(node, TR::iconst, 0, hdrSize));
-
+      TR::Node *arrayRefNode = TR::TransformUtil::generateArrayStartTrees(comp(), node);
       arrayRefNode->setIsInternalPointer(true);
 
-      TR::Node *sizeInBytes;
       TR::Node *sizeNode = node->getFirstChild();
+      int32_t elementSize = TR::Compiler->om.getSizeOfArrayElement(node);
+      TR::Node *sizeInBytes = TR::TransformUtil::generateArrayOffsetTrees(comp(), sizeNode, NULL, elementSize);
 
       TR::Node* constValNode = TR::Node::bconst(node, (int8_t)0);
-      int32_t elementSize = TR::Compiler->om.getSizeOfArrayElement(node);
-
-      if (is64BitTarget)
-         {
-         TR::Node *stride = TR::Node::create(node, TR::lconst);
-         stride->setLongInt((int64_t) elementSize);
-         TR::Node *i2lNode = TR::Node::create(TR::i2l, 1, sizeNode);
-         sizeInBytes = TR::Node::create(TR::lmul, 2, i2lNode, stride);
-         }
-      else
-         {
-         TR::Node *stride = TR::Node::create(node, TR::iconst, 0, elementSize);
-         sizeInBytes = TR::Node::create(TR::imul, 2, sizeNode, stride);
-         }
-
       TR::Node *arraysetNode = TR::Node::create(TR::arrayset, 3, arrayRefNode, constValNode, sizeInBytes);
       TR::SymbolReference *arraySetSymRef = comp()->getSymRefTab()->findOrCreateArraySetSymbol();
       arraysetNode->setSymbolReference(arraySetSymRef);
