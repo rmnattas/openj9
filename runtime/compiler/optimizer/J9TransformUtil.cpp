@@ -212,7 +212,7 @@ J9::TransformUtil::findArrayIndexNode(TR::Compilation *comp, TR::Node *loadNode)
    TR::Node *alddNode = loadNode->getFirstChild();
    TR::Node *indexNode = NULL;
    if (alddNode->getFirstChild()->isDataAddrPointer()
-      || alddNode->getSecondChild()->getOpCode().isLoadConst())
+      || alddNode->getSecondChild()->getNumChildren() == 0)
       {
       indexNode = alddNode->getSecondChild();
       }
