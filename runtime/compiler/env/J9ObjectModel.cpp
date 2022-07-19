@@ -368,7 +368,6 @@ J9::ObjectModel::isDiscontiguousArray(int32_t sizeInBytes)
     */
    J9JavaVM *vm = TR::Compiler->javaVM;
    if ((!vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm)
-         && TR::Compiler->om.canGenerateArraylets()
          && sizeInBytes > TR::Compiler->om.maxContiguousArraySizeInBytes())
       || (TR::Compiler->om.useHybridArraylets() && sizeInBytes == 0))
       return true;
@@ -393,7 +392,6 @@ J9::ObjectModel::isDiscontiguousArray(int32_t sizeInElements, int32_t elementSiz
     */
    J9JavaVM *vm = TR::Compiler->javaVM;
    if ((!vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm)
-         && TR::Compiler->om.canGenerateArraylets()
          && sizeInElements > maxContiguousArraySizeInElements)
       || (TR::Compiler->om.useHybridArraylets() && sizeInElements == 0))
       return true;
