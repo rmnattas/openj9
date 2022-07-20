@@ -262,7 +262,7 @@ int32_t TR_VarHandleTransformer::perform()
              else
                 callTree->insertBefore(TR::TreeTop::create(comp(), TR::Node::create(node, TR::treetop, 1, handleTable)));
 
-             TR::Node *methodHandleAddr = J9::TransformUtil::calculateElementAddressWithIndex(comp(), handleTable, index, TR::Address);
+             TR::Node *methodHandleAddr = J9::TransformUtil::calculateElementAddress(comp(), handleTable, index, TR::Address);
              TR::Node *methodHandle = TR::Node::createWithSymRef(comp()->il.opCodeForIndirectArrayLoad(TR::Address), 1, 1, methodHandleAddr, comp()->getSymRefTab()->findOrCreateArrayShadowSymbolRef(TR::Address, handleTable));
              methodHandle->copyByteCodeInfo(node);
 
