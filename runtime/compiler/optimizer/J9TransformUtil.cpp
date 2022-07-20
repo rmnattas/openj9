@@ -1739,36 +1739,19 @@ J9::TransformUtil::insertNewFirstBlockForCompilation(TR::Compilation *comp)
    return newFirstBlock;
    }
 
-TR::Node * J9::TransformUtil::calculateElementAddress(TR::Compilation *comp, TR::Node *array, TR::Node *index, TR::Node * offset)
-{
-   TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp->fe());
-   bool isOffHeapAllocationEnabled = fej9->vmThread()->javaVM->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(fej9->vmThread()->javaVM);
-
-   // Calculate element address
-   TR::Node *baseNodeForAdd = array;
-   TR::Node *addrCalc = NULL;
-   if (comp->target().is64Bit())
-      {
-      if (isOffHeapAllocationEnabled)
-         {
-         TR::SymbolReference *dataAddrFieldOffset = comp->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(fej9->getOffsetOfContiguousDataAddrField());
-         baseNodeForAdd = TR::Node::createWithSymRef(TR::aloadi, 1, array, 0, dataAddrFieldOffset);
-         }
-      addrCalc = TR::Node::create(TR::aladd, 2, baseNodeForAdd, offset);
-      }
-   else
-      addrCalc = TR::Node::create(TR::aiadd, 2, baseNodeForAdd, TR::Node::create(TR::l2i, 1, offset));
-
-   addrCalc->setIsInternalPointer(true);
-   return addrCalc;
-}
-
-TR::Node * J9::TransformUtil::calculateElementAddressWithIndex(TR::Compilation *comp, TR::Node *array, TR::Node *index, TR::DataType type)
+TR::Node * J9::TransformUtil::calculateElementAddress(TR::Compilation *comp, TR::Node *array, TR::Node *index, TR::DataType type)
 {
    TR::Node * offset = TR::TransformUtil::calculateOffsetFromIndexInContiguousArray(comp, index, type);
    offset->setIsNonNegative(true);
+   // Calculate element address
+   TR::Node *addrCalc = NULL;
+   if (comp->target().is64Bit())
+      addrCalc = TR::Node::create(TR::aladd, 2, array, offset);
+   else
+      addrCalc = TR::Node::create(TR::aiadd, 2, array, TR::Node::create(TR::l2i, 1, offset));
 
-   return J9::TransformUtil::calculateElementAddress(comp, array, offset);
+   addrCalc->setIsInternalPointer(true);
+   return addrCalc;
 }
 
 TR::Node * J9::TransformUtil::calculateOffsetFromIndexInContiguousArray(TR::Compilation *comp, TR::Node * index, TR::DataType type)
@@ -1788,7 +1771,15 @@ TR::Node * J9::TransformUtil::calculateElementAddressWithElementStride(TR::Compi
    TR::Node * offset = TR::TransformUtil::calculateOffsetFromIndexInContiguousArrayWithElementStride(comp, index, elementStride);
    offset->setIsNonNegative(true);
 
-   return J9::TransformUtil::calculateElementAddress(comp, array, offset);
+   // Calculate element address
+   TR::Node *addrCalc = NULL;
+   if (comp->target().is64Bit())
+      addrCalc = TR::Node::create(TR::aladd, 2, array, offset);
+   else
+      addrCalc = TR::Node::create(TR::aiadd, 2, array, TR::Node::create(TR::l2i, 1, offset));
+
+   addrCalc->setIsInternalPointer(true);
+   return addrCalc;
 }
 
 static int32_t checkNonNegativePowerOfTwo(int32_t value)

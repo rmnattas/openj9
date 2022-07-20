@@ -1061,7 +1061,7 @@ LoadArrayElementTransformer::lower(TR::Node* const node, TR::TreeTop* const tt)
    TR::Node *anchoredArrayBaseAddressNode = anchoredArrayBaseAddressTT->getNode()->getFirstChild();
    TR::Node *anchoredElementIndexNode = anchoredElementIndexTT->getNode()->getFirstChild();
 
-   TR::Node *elementAddress = J9::TransformUtil::calculateElementAddressWithIndex(comp, anchoredArrayBaseAddressNode, anchoredElementIndexNode, TR::Address);
+   TR::Node *elementAddress = J9::TransformUtil::calculateElementAddress(comp, anchoredArrayBaseAddressNode, anchoredElementIndexNode, TR::Address);
    TR::SymbolReference *elementSymRef = comp->getSymRefTab()->findOrCreateArrayShadowSymbolRef(TR::Address, anchoredArrayBaseAddressNode);
    TR::Node *elementLoadNode = TR::Node::createWithSymRef(comp->il.opCodeForIndirectArrayLoad(TR::Address), 1, 1, elementAddress, elementSymRef);
    elementLoadNode->copyByteCodeInfo(node);
@@ -1392,7 +1392,7 @@ StoreArrayElementTransformer::lower(TR::Node* const node, TR::TreeTop* const tt)
    TR::Node *anchoredElementIndexNode = anchoredElementIndexTT->getNode()->getFirstChild();
    TR::Node *anchoredArrayBaseAddressNode = anchoredArrayBaseAddressTT->getNode()->getFirstChild();
 
-   TR::Node *elementAddress = J9::TransformUtil::calculateElementAddressWithIndex(comp, anchoredArrayBaseAddressNode, anchoredElementIndexNode, TR::Address);
+   TR::Node *elementAddress = J9::TransformUtil::calculateElementAddress(comp, anchoredArrayBaseAddressNode, anchoredElementIndexNode, TR::Address);
 
    TR::SymbolReference *elementSymRef = comp->getSymRefTab()->findOrCreateArrayShadowSymbolRef(TR::Address, anchoredArrayBaseAddressNode);
    TR::Node *elementStoreNode = TR::Node::createWithSymRef(TR::awrtbari, 3, 3, elementAddress, anchoredValueNode, anchoredArrayBaseAddressNode, elementSymRef);
