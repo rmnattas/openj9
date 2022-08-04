@@ -371,20 +371,8 @@ int32_t TR_UnsafeFastPath::perform()
             charArray->setIsNonNull(true);
 
             prepareToReplaceNode(node); // This will remove the usedef info, valueNumber info and all children of the node
-            TR::Node *addrCalc;
-            if (comp()->target().is64Bit())
-               {
-               addrCalc = TR::Node::create(TR::aladd, 2, charArray,
-                     TR::Node::create(TR::ladd, 2, TR::Node::create(TR::lmul, 2, TR::Node::create(TR::i2l, 1, index), TR::Node::lconst(index, 4)),
-                                       TR::Node::lconst(index, TR::Compiler->om.contiguousArrayHeaderSizeInBytes())));
-               }
-            else
-               {
-               addrCalc = TR::Node::create(TR::aiadd, 2, charArray,
-                     TR::Node::create(TR::iadd, 2, TR::Node::create(TR::imul, 2, index, TR::Node::iconst(index, 4)),
-                                       TR::Node::iconst(index, TR::Compiler->om.contiguousArrayHeaderSizeInBytes())));
-               }
-
+            TR::Node *indexInBytesNode = TR::TransformUtil::generateOffsetNode(comp(), index, NULL, 4, false);
+            TR::Node *addrCalc = TR::TransformUtil::generateArrayAddressNode(comp(), charArray, indexInBytesNode);
             TR::SymbolReference * unsafeSymRef = comp()->getSymRefTab()->findOrCreateUnsafeSymbolRef(TR::Int32, true, false);
             node = TR::Node::recreateWithoutProperties(node, TR::istorei, 2, addrCalc, value, unsafeSymRef);
 
@@ -808,7 +796,7 @@ int32_t TR_UnsafeFastPath::perform()
 
                TR::Node *addrCalc = NULL;
 
-               // TODO: can we call same api to generate addrCalc
+               // TODO_sverma: can we call same api to generate addrCalc
                // Calculate element address
                if (comp()->target().is64Bit())
                   addrCalc = TR::Node::create(TR::aladd, 2, base, offset);
@@ -921,11 +909,9 @@ int32_t TR_UnsafeFastPath::perform()
                bool isOffHeapAllocationEnabled = vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm);
 
 #if defined(TR_TARGET_64BIT)
-               if (isArrayOperation && comp()->target().is64Bit() && isOffHeapAllocationEnabled)
+               if (isArrayOperation && isOffHeapAllocationEnabled)
                   {
-                  TR::SymbolReference *dataAddrFieldOffset = comp()->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(fej9->getOffsetOfContiguousDataAddrField());
-                  TR::Node *baseNodeForAdd = TR::Node::createWithSymRef(TR::aloadi, 1, base, 0, dataAddrFieldOffset);
-                  baseNodeForAdd->setIsDataAddrPointer(true);
+                  TR::Node *baseNodeForAdd = TR::TransformUtil::generateDataAddrLoadTrees(comp(), base);
                   TR::Node *newOffset = TR::Node::create(TR::ladd, 2, offset, TR::Node::lconst(-16));
 
                   addrCalc = TR::Node::create(TR::aladd, 2, baseNodeForAdd, newOffset);
