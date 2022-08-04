@@ -625,7 +625,7 @@ TR::Node* TR_DataAccessAccelerator::insertDecimalGetIntrinsic(TR::TreeTop* callT
          case 8: targetDataType = TR::Double; break;
          }
 
-      TR::Node* valueNode = TR::Node::createWithSymRef(op, 1, 1, constructAddressNode(callTreeTop, callNode, byteArrayNode, offsetNode), comp()->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(0));
+      TR::Node* valueNode = TR::Node::createWithSymRef(op, 1, 1, constructAddressNode(callNode, byteArrayNode, offsetNode), comp()->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(0));
 
       if (requiresByteSwap)
          {
@@ -737,7 +737,7 @@ TR::Node* TR_DataAccessAccelerator::insertDecimalSetIntrinsic(TR::TreeTop* callT
             }
          }
 
-      return TR::Node::createWithSymRef(op, 2, 2, constructAddressNode(callTreeTop, callNode, byteArrayNode, offsetNode), valueNode, comp()->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(0));
+      return TR::Node::createWithSymRef(op, 2, 2, constructAddressNode(callNode, byteArrayNode, offsetNode), valueNode, comp()->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(0));
       }
 
    return NULL;
@@ -957,7 +957,7 @@ TR::Node* TR_DataAccessAccelerator::insertIntegerGetIntrinsic(TR::TreeTop* callT
          case 8: targetDataType = TR::Int64; break;
          }
 
-      TR::Node* valueNode = TR::Node::createWithSymRef(op, 1, 1, constructAddressNode(callTreeTop, callNode, byteArrayNode, offsetNode), comp()->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(0));
+      TR::Node* valueNode = TR::Node::createWithSymRef(op, 1, 1, constructAddressNode(callNode, byteArrayNode, offsetNode), comp()->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(0));
 
       if (requiresByteSwap)
          {
@@ -1085,7 +1085,7 @@ TR::Node* TR_DataAccessAccelerator::insertIntegerSetIntrinsic(TR::TreeTop* callT
          valueNode = TR::Node::create(byteswapOp, 1, valueNode);
          }
 
-      return TR::Node::createWithSymRef(op, 2, 2, constructAddressNode(callTreeTop, callNode, byteArrayNode, offsetNode), valueNode, comp()->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(0));
+      return TR::Node::createWithSymRef(op, 2, 2, constructAddressNode(callNode, byteArrayNode, offsetNode), valueNode, comp()->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(0));
       }
 
    return NULL;
