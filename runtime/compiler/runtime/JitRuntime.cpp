@@ -645,9 +645,19 @@ void J9FASTCALL _jitProfileStringValue(uintptr_t value, int32_t charsOffset, int
       {
       readValues = true;
 
+      J9JavaVM *jvm = jitConfig->javaVM;
+      uintptr_t startOfData = 0;
+#if defined(TR_TARGET_64BIT)
+      if (TR::Compiler->om.isOffHeapAllocationEnabled())
+         startOfData = *(uintptr_t *) (value + TR::Compiler->om.offsetOfContiguousDataAddrField());
+      else
+#endif /* TR_TARGET_64BIT */
+         {
+         startOfData = (uintptr_t) (value + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+         }
+
       if (TR::Compiler->om.compressObjectReferences())
          {
-         J9JavaVM *jvm = jitConfig->javaVM;
          if (!jvm)
             return;
 
@@ -655,12 +665,10 @@ void J9FASTCALL _jitProfileStringValue(uintptr_t value, int32_t charsOffset, int
          J9VMThread *vmThread = jvm->internalVMFunctions->currentVMThread(jvm);
          int32_t result = mmf->j9gc_objaccess_compressedPointersShift(vmThread);
 
-         chars = (char *) (( (uintptr_t) (*((uint32_t *) (value + charsOffset)))) << result);
+         chars = (char *) (( (uintptr_t) (*((uint32_t *) (startOfData + charsOffset)))) << result);
          }
       else
-         chars = *((char **) (value + charsOffset));
-
-      chars = chars + (TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+         chars = *((char **) (startOfData + charsOffset));
 
       length = *((int32_t *) (value + lengthOffset));
       if (length > 128)
