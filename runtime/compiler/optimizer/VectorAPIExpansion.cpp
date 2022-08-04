@@ -1254,8 +1254,8 @@ TR_VectorAPIExpansion::generateAddressNode(TR::Compilation *comp, TR::Node *arra
    while ((elementSize = (elementSize >> 1)))
         ++shiftAmount;
 
-   TR::Node *offsetNode = TR::TransformUtil::generateOffsetNode(comp, arrayIndex, NULL, shiftAmount, true);
-   TR::Node *aladdNode = TR::TransformUtil::generateArrayAddressNode(comp, array, offsetNode);
+   TR::Node *offsetNode = TR::TransformUtil::generateArrayOffsetTrees(comp, arrayIndex, NULL, shiftAmount, true);
+   TR::Node *aladdNode = TR::TransformUtil::generateArrayAddressTrees(comp, array, offsetNode);
 
    return aladdNode;
    }
