@@ -1130,8 +1130,8 @@ TR::Node* TR_DataAccessAccelerator::constructAddressNode(TR::Node* callNode, TR:
          }
       }
 
-   totalOffsetNode = TR::TransformUtil::generateOffsetNode(comp(), offsetNode, NULL, isSrcOrTargetUnicodeDecimal ? 2 : 1, false);
-   arrayAddressNode = TR::TransformUtil::generateArrayAddressNode(comp(), arrayNode, totalOffsetNode);
+   totalOffsetNode = TR::TransformUtil::generateArrayOffsetTrees(comp(), offsetNode, NULL, isSrcOrTargetUnicodeDecimal ? 2 : 1, false);
+   arrayAddressNode = TR::TransformUtil::generateArrayAddressTrees(comp(), arrayNode, totalOffsetNode);
    arrayAddressNode->setIsInternalPointer(true);
    return arrayAddressNode;
    }
@@ -2573,7 +2573,7 @@ bool TR_DataAccessAccelerator::generatePD2UD(TR::TreeTop* treeTop, TR::Node* cal
       pdload->setDecimalPrecision(prec);
 
       //set up decimal arrayAddressNode
-      TR::Node * decimalAddressNode = constructAddressNode(callNode, decimalNode, decimalOffsetNode, true, isTargetUnicodeDecimal)
+      TR::Node * decimalAddressNode = constructAddressNode(callNode, decimalNode, decimalOffsetNode, true, isTargetUnicodeDecimal);
 
       //set up pd2decimal node
       TR::ILOpCodes op = TR::BadILOp;
