@@ -6752,7 +6752,7 @@ TR_J9ByteCodeIlGenerator::genNewArray(int32_t typeIndex)
       {
       node->setCanSkipZeroInitialization(true);
 
-      TR::Node *arrayRefNode = TR::TransformUtil::generateArrayStartTrees(comp(), node);;
+      TR::Node *arrayRefNode = TR::TransformUtil::generateArrayStartTrees(comp(), node);
       arrayRefNode->setIsInternalPointer(true);
 
       TR::Node *sizeNode = node->getFirstChild();
