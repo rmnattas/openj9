@@ -164,7 +164,10 @@ J9::TransformUtil::generateArrayStartTrees(TR::Compilation *comp, TR::Node *arra
 TR::Node *
 J9::TransformUtil::generateArrayOffsetTrees(TR::Compilation *comp, TR::Node *indexNode, TR::Node *strideNode, int32_t elementSize, bool useShiftOpCode)
    {
-   TR::Node *offsetNode = indexNode->convertStoreDirectToLoadWithI2LIfNeeded();
+   TR::Node *offsetNode = indexNode->createLongIfNeeded();
+   // TODO_sverma: Need to investigate why using convertStoreDirectToLoadWithI2LIfNeeded
+   //              results in null pointer exceptions.
+   // TR::Node *offsetNode = indexNode->convertStoreDirectToLoadWithI2LIfNeeded();
 
    if (strideNode != NULL || elementSize > 1)
       {
