@@ -161,26 +161,27 @@ MM_ObjectAccessBarrier::copyStringCritical(J9VMThread *vmThread, GC_ArrayObjectM
 {
 	jint length = J9VMJAVALANGSTRING_LENGTH(vmThread, stringObject);
 	UDATA sizeInBytes = length * sizeof(jchar);
-	*data = (jchar*)functions->jniArrayAllocateMemoryFromThread(vmThread, sizeInBytes);
-	if (NULL == *data) {
+	jchar *copyArr = (jchar*)functions->jniArrayAllocateMemoryFromThread(vmThread, sizeInBytes);
+	if (NULL == copyArr) {
 		/* better error message here? */
 		functions->setNativeOutOfMemoryError(vmThread, 0, 0);
 	} else {
 		if (isCompressed) {
 			for (jint i = 0; i < length; i++) {
-				*data[i] = (jchar)(U_8)J9JAVAARRAYOFBYTE_LOAD(vmThread, (j9object_t)valueObject, i);
+				copyArr[i] = (jchar)(U_8)J9JAVAARRAYOFBYTE_LOAD(vmThread, (j9object_t)valueObject, i);
 			}
 		} else {
 			if (J9_ARE_ANY_BITS_SET(javaVM->runtimeFlags, J9_RUNTIME_STRING_BYTE_ARRAY)) {
 				/* This API determines the stride based on the type of valueObject so in the [B case we must passin the length in bytes */
-				indexableObjectModel->memcpyFromArray(*data, valueObject, 0, (I_32)sizeInBytes);
+				indexableObjectModel->memcpyFromArray(copyArr, valueObject, 0, (I_32)sizeInBytes);
 			} else {
-				indexableObjectModel->memcpyFromArray(*data, valueObject, 0, length);
+				indexableObjectModel->memcpyFromArray(copyArr, valueObject, 0, length);
 			}
 		}
 		if (NULL != isCopy) {
 			*isCopy = JNI_TRUE;
 		}
+		*data = copyArr;
 		vmThread->jniCriticalCopyCount += 1;
 	}
 }
