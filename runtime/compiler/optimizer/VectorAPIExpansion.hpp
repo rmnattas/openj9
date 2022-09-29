@@ -503,7 +503,10 @@ class TR_VectorAPIExpansion : public TR::Optimization
   /** \brief
    *     Generates address node based on the array pointer, array index  and element size
    *
-   *  \param array
+   *  \param comp
+   *     Compilation
+   *
+   * \param array
    *     Node pointing to the base of the array
    *
    *  \param arrayIndex
@@ -515,7 +518,7 @@ class TR_VectorAPIExpansion : public TR::Optimization
    *  \return
    *     Address node
    */
-   static TR::Node *generateAddressNode(TR::Node *array, TR::Node *arrayIndex, int32_t elementSize);
+   static TR::Node *generateAddressNode(TR::Compilation *comp, TR::Node *array, TR::Node *arrayIndex, int32_t elementSize);
 
 
   /** \brief
