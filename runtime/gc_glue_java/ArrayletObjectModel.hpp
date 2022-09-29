@@ -1030,9 +1030,13 @@ public:
 		} else {
 			if (isVirtualLargeObjectHeapEnabled()) { 
 				isValidDataAddr = isValidDataAddrForDoubleMappedObject;
-			} else if (isDoubleMappingEnabled()) {
+			}
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+			 else if (isDoubleMappingEnabled()) {
 				isValidDataAddr = isValidDataAddrForDoubleMappedObject && ((void *)((uintptr_t)arrayPtr + contiguousHeaderSize()) == getArrayoidPointer(arrayPtr));
-			} else {
+			}
+#endif
+			else {
 				isValidDataAddr = (dataAddr == NULL);
 			}
 		}
