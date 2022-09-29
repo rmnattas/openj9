@@ -27,6 +27,7 @@
 #include "il/Node_inlines.hpp"
 #include "il/SymbolReference.hpp"
 #include "optimizer/VectorAPIExpansion.hpp"
+#include "optimizer/TransformUtil.hpp"
 
 
 const char *
@@ -1220,26 +1221,17 @@ void TR_VectorAPIExpansion::anchorOldChildren(TR_VectorAPIExpansion *opt, TR::Tr
 
 
 TR::Node *
-TR_VectorAPIExpansion::generateAddressNode(TR::Node *array, TR::Node *arrayIndex, int32_t elementSize)
+TR_VectorAPIExpansion::generateAddressNode(TR::Compilation *comp, TR::Node *array, TR::Node *arrayIndex, int32_t elementSize)
    {
+   // Adding an assert because the callers expect 64 bit opCodes.
+   TR_ASSERT_FATAL_WITH_NODE(array, comp->target().is64Bit(), "TR_VectorAPIExpansion::generateAddressNode supports 64 bit vm only.");
+
    int32_t shiftAmount = 0;
    while ((elementSize = (elementSize >> 1)))
         ++shiftAmount;
 
-
-   TR::Node *lshlNode = TR::Node::create(TR::lshl, 2);
-   lshlNode->setAndIncChild(0, arrayIndex);
-   lshlNode->setAndIncChild(1, TR::Node::create(TR::iconst, 0, shiftAmount));
-
-   TR::Node *laddNode = TR::Node::create(TR::ladd, 2);
-   laddNode->setAndIncChild(0, lshlNode);
-
-   int32_t arrayHeaderSize = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
-   laddNode->setAndIncChild(1, TR::Node::create(TR::lconst, 0, arrayHeaderSize));
-
-   TR::Node *aladdNode = TR::Node::create(TR::aladd, 2);
-   aladdNode->setAndIncChild(0, array);
-   aladdNode->setAndIncChild(1, laddNode);
+   TR::Node *offsetNode = TR::TransformUtil::generateOffsetNode(comp, arrayIndex, NULL, shiftAmount, true);
+   TR::Node *aladdNode = TR::TransformUtil::generateArrayAddressNode(comp, array, offsetNode);
 
    return aladdNode;
    }
@@ -1428,7 +1420,7 @@ TR::Node *TR_VectorAPIExpansion::transformLoadFromArray(TR_VectorAPIExpansion *o
    TR::Compilation *comp = opt->comp();
 
    int32_t elementSize = OMR::DataType::getSize(elementType);
-   TR::Node *aladdNode = generateAddressNode(array, arrayIndex, objType == Mask ? 1 : elementSize);
+   TR::Node *aladdNode = generateAddressNode(comp, array, arrayIndex, objType == Mask ? 1 : elementSize);
 
    anchorOldChildren(opt, treeTop, node);
 
@@ -1638,7 +1630,7 @@ TR::Node *TR_VectorAPIExpansion::transformStoreToArray(TR_VectorAPIExpansion *op
    TR::Compilation *comp = opt->comp();
 
    int32_t  elementSize = OMR::DataType::getSize(elementType);
-   TR::Node *aladdNode = generateAddressNode(array, arrayIndex, objType == Mask ? 1 : elementSize);
+   TR::Node *aladdNode = generateAddressNode(comp, array, arrayIndex, objType == Mask ? 1 : elementSize);
 
    anchorOldChildren(opt, treeTop, node);
    node->setAndIncChild(0, aladdNode);
