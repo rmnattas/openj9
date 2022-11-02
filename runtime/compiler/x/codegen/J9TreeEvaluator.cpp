@@ -1466,7 +1466,7 @@ TR::Register *J9::X86::TreeEvaluator::multianewArrayEvaluator(TR::Node *node, TR
    // 2-dimensional MultiANewArray
    TR::Compilation *comp = cg->comp();
    TR_ASSERT_FATAL(comp->target().is64Bit(), "multianewArrayEvaluator is only supported on 64-bit JVMs!");
-   TR_J9VMBase *fej9 = static_cast<TR_J9VMBase *>(comp->fe());
+   TR_J9VMBase *fej9 = comp->fej9();
 
    TR::Register *dimsPtrReg = NULL;
    TR::Register *dimReg = NULL;
@@ -1492,9 +1492,12 @@ TR::Register *J9::X86::TreeEvaluator::multianewArrayEvaluator(TR::Node *node, TR
    TR::LabelSymbol *fallThru = generateLabelSymbol(cg);
    TR::LabelSymbol *loopLabel = generateLabelSymbol(cg);
    TR::LabelSymbol *nonZeroFirstDimLabel = generateLabelSymbol(cg);
-#ifdef TR_TARGET_64BIT
-   TR::LabelSymbol *populateFirstDimDataAddrSlot = generateLabelSymbol(cg);
-#endif /* TR_TARGET_64BIT */
+#if defined(TR_TARGET_64BIT)
+   bool isIndexableDataAddrPresent = TR::Compiler->om.isIndexableDataAddrPresent();
+   TR::LabelSymbol *populateFirstDimDataAddrSlot = NULL;
+   if (isIndexableDataAddrPresent)
+      populateFirstDimDataAddrSlot = generateLabelSymbol(cg);
+#endif /* defined(TR_TARGET_64BIT) */
 
    startLabel->setStartInternalControlFlow();
    fallThru->setEndInternalControlFlow();
@@ -1550,19 +1553,22 @@ TR::Register *J9::X86::TreeEvaluator::multianewArrayEvaluator(TR::Node *node, TR
    generateMemImmInstruction(TR::InstOpCode::S4MemImm4, node, generateX86MemoryReference(targetReg, fej9->getOffsetOfDiscontiguousArraySizeField(), cg), 0, cg);
 
 #if defined(TR_TARGET_64BIT)
-   // Load dataAddr slot offset difference since 0 size arrays are treated as discontiguous.
-   TR_ASSERT_FATAL_WITH_NODE(node
-      , IS_32BIT_SIGNED(fej9->getOffsetOfDiscontiguousDataAddrField() - fej9->getOffsetOfContiguousDataAddrField())
-      , "dataAddrFieldOffset is too big for the instruction.");
+   if (isIndexableDataAddrPresent)
+      {
+      // Load dataAddr slot offset difference since 0 size arrays are treated as discontiguous.
+      TR_ASSERT_FATAL_WITH_NODE(node
+         , IS_32BIT_SIGNED(fej9->getOffsetOfDiscontiguousDataAddrField() - fej9->getOffsetOfContiguousDataAddrField())
+         , "dataAddrFieldOffset is too big for the instruction.");
 
-   generateRegImm64Instruction(TR::InstOpCode::MOV8RegImm64
-      , node, temp3Reg
-      , static_cast<int32_t>(fej9->getOffsetOfDiscontiguousDataAddrField() - fej9->getOffsetOfContiguousDataAddrField())
-      , cg);
+      generateRegImm64Instruction(TR::InstOpCode::MOV8RegImm64
+         , node, temp3Reg
+         , static_cast<int32_t>(fej9->getOffsetOfDiscontiguousDataAddrField() - fej9->getOffsetOfContiguousDataAddrField())
+         , cg);
 
-   generateLabelInstruction(TR::InstOpCode::JMP4, node, populateFirstDimDataAddrSlot, cg);
-#else
-   generateLabelInstruction(TR::InstOpCode::JMP4, node, fallThru, cg);
+      generateLabelInstruction(TR::InstOpCode::JMP4, node, populateFirstDimDataAddrSlot, cg);
+      }
+   else
+      generateLabelInstruction(TR::InstOpCode::JMP4, node, fallThru, cg);
 #endif /* TR_TARGET_64BIT */
 
    //First dim length not 0
@@ -1628,17 +1634,20 @@ TR::Register *J9::X86::TreeEvaluator::multianewArrayEvaluator(TR::Node *node, TR
    generateMemImmInstruction(TR::InstOpCode::S4MemImm4, node, generateX86MemoryReference(temp2Reg, fej9->getOffsetOfDiscontiguousArraySizeField(), cg), 0, cg);
 
 #if defined(TR_TARGET_64BIT)
-   // Populate dataAddr slot for 2nd dimension zero size array.
-   generateRegMemInstruction(TR::InstOpCode::LEARegMem()
-      , node
-      , temp3Reg
-      , generateX86MemoryReference(temp2Reg, TR::Compiler->om.discontiguousArrayHeaderSizeInBytes(), cg)
-      , cg);
-   generateMemRegInstruction(TR::InstOpCode::SMemReg()
-      , node
-      , generateX86MemoryReference(temp2Reg, fej9->getOffsetOfDiscontiguousDataAddrField(), cg)
-      , temp3Reg
-      , cg);
+   if (isIndexableDataAddrPresent)
+      {
+      // Populate dataAddr slot for 2nd dimension zero size array.
+      generateRegMemInstruction(TR::InstOpCode::LEARegMem()
+         , node
+         , temp3Reg
+         , generateX86MemoryReference(temp2Reg, TR::Compiler->om.discontiguousArrayHeaderSizeInBytes(), cg)
+         , cg);
+      generateMemRegInstruction(TR::InstOpCode::SMemReg()
+         , node
+         , generateX86MemoryReference(temp2Reg, fej9->getOffsetOfDiscontiguousDataAddrField(), cg)
+         , temp3Reg
+         , cg);
+      }
 #endif /* TR_TARGET_64BIT */
 
    // Store 2nd dim element into 1st dim array slot, compress temp2 if needed
@@ -1665,11 +1674,14 @@ TR::Register *J9::X86::TreeEvaluator::multianewArrayEvaluator(TR::Node *node, TR
    generateLabelInstruction(TR::InstOpCode::JA4, node, loopLabel, cg);
 
 #if defined(TR_TARGET_64BIT)
-   // No offset is needed since 1st dimension array is contiguous.
-   generateRegRegInstruction(TR::InstOpCode::XORRegReg(), node, temp3Reg, temp3Reg, cg);
-   generateLabelInstruction(TR::InstOpCode::JMP4, node, populateFirstDimDataAddrSlot, cg);
-#else
-   generateLabelInstruction(TR::InstOpCode::JMP4, node, fallThru, cg);
+   if (isIndexableDataAddrPresent)
+      {
+      // No offset is needed since 1st dimension array is contiguous.
+      generateRegRegInstruction(TR::InstOpCode::XORRegReg(), node, temp3Reg, temp3Reg, cg);
+      generateLabelInstruction(TR::InstOpCode::JMP4, node, populateFirstDimDataAddrSlot, cg);
+      }
+   else
+      generateLabelInstruction(TR::InstOpCode::JMP4, node, fallThru, cg);
 #endif /* TR_TARGET_64BIT */
 
    TR::RegisterDependencyConditions  *deps = generateRegisterDependencyConditions((uint8_t)0, 13, cg);
@@ -1718,20 +1730,23 @@ TR::Register *J9::X86::TreeEvaluator::multianewArrayEvaluator(TR::Node *node, TR
    generateLabelInstruction(TR::InstOpCode::JMP4, node, oolFailLabel, cg);
 
 #if defined(TR_TARGET_64BIT)
-   /* Populate dataAddr slot of 1st dimension array. Arrays of non-zero size
-    * use contiguous header layout while zero size arrays use discontiguous header layout.
-    */
-   generateLabelInstruction(TR::InstOpCode::label, node, populateFirstDimDataAddrSlot, cg);
-   generateRegMemInstruction(TR::InstOpCode::LEARegMem()
-      , node
-      , temp2Reg
-      , generateX86MemoryReference(targetReg, temp3Reg, 0, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg)
-      , cg);
-   generateMemRegInstruction(TR::InstOpCode::SMemReg()
-      , node
-      , generateX86MemoryReference(targetReg, temp3Reg, 0, fej9->getOffsetOfContiguousDataAddrField(), cg)
-      , temp2Reg
-      , cg);
+   if (isIndexableDataAddrPresent)
+      {
+      /* Populate dataAddr slot of 1st dimension array. Arrays of non-zero size
+       * use contiguous header layout while zero size arrays use discontiguous header layout.
+       */
+      generateLabelInstruction(TR::InstOpCode::label, node, populateFirstDimDataAddrSlot, cg);
+      generateRegMemInstruction(TR::InstOpCode::LEARegMem()
+         , node
+         , temp2Reg
+         , generateX86MemoryReference(targetReg, temp3Reg, 0, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg)
+         , cg);
+      generateMemRegInstruction(TR::InstOpCode::SMemReg()
+         , node
+         , generateX86MemoryReference(targetReg, temp3Reg, 0, fej9->getOffsetOfContiguousDataAddrField(), cg)
+         , temp2Reg
+         , cg);
+      }
 #endif /* TR_TARGET_64BIT */
 
    generateLabelInstruction(TR::InstOpCode::label, node, fallThru, deps, cg);
