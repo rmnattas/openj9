@@ -4686,7 +4686,7 @@ J9::Z::TreeEvaluator::multianewArrayEvaluator(TR::Node * node, TR::CodeGenerator
    TR::Compilation *comp = cg->comp();
    TR_Debug *compDebug = comp->getDebug();
    TR_ASSERT_FATAL(comp->target().is64Bit(), "multianewArrayEvaluator is only supported on 64-bit JVMs!");
-   TR_J9VMBase *fej9 = static_cast<TR_J9VMBase *>(comp->fe());
+   TR_J9VMBase *fej9 = comp->fej9();
    TR::Register *targetReg = cg->allocateRegister();
    TR::Instruction *cursor = NULL;
 
@@ -4698,9 +4698,13 @@ J9::Z::TreeEvaluator::multianewArrayEvaluator(TR::Node * node, TR::CodeGenerator
    TR::LabelSymbol *nonZeroFirstDimLabel = generateLabelSymbol(cg);
    TR::LabelSymbol *cFlowRegionEnd = generateLabelSymbol(cg);
    TR::LabelSymbol *oolFailLabel = generateLabelSymbol(cg);
+
 #if defined(TR_TARGET_64BIT)
-   TR::LabelSymbol *populateFirstDimDataAddrSlot = generateLabelSymbol(cg);
-#endif /* TR_TARGET_64BIT */
+   bool isIndexableDataAddrPresent = TR::Compiler->om.isIndexableDataAddrPresent();
+   TR::LabelSymbol *populateFirstDimDataAddrSlot = NULL;
+   if (isIndexableDataAddrPresent)
+      populateFirstDimDataAddrSlot = generateLabelSymbol(cg);
+#endif /* defined(TR_TARGET_64BIT) */
 
    // oolJumpLabel is a common point that all branches will jump to. From this label, we branch to OOL code.
    // We do this instead of jumping directly to OOL code from mainline because the RA can only handle the case where there's
@@ -4763,19 +4767,22 @@ J9::Z::TreeEvaluator::multianewArrayEvaluator(TR::Node * node, TR::CodeGenerator
 
    generateRXInstruction(cg, use64BitClasses ? TR::InstOpCode::STG : TR::InstOpCode::ST, node, classReg, generateS390MemoryReference(targetReg, TR::Compiler->om.offsetOfObjectVftField(), cg));
 #if defined(TR_TARGET_64BIT)
-   TR_ASSERT_FATAL_WITH_NODE(node
-      , IS_32BIT_SIGNED(fej9->getOffsetOfDiscontiguousDataAddrField() - fej9->getOffsetOfContiguousDataAddrField())
-      , "dataAddrFieldOffset is too big for the instruction.");
+   if (isIndexableDataAddrPresent)
+      {
+      TR_ASSERT_FATAL_WITH_NODE(node
+         , IS_32BIT_SIGNED(fej9->getOffsetOfDiscontiguousDataAddrField() - fej9->getOffsetOfContiguousDataAddrField())
+         , "dataAddrFieldOffset is too big for the instruction.");
 
-   // Load dataAddr slot offset difference since 0 size arrays are treated as discontiguous.
-   generateRILInstruction(cg
-      , TR::InstOpCode::LGFI
-      , node
-      , temp1Reg
-      , static_cast<int32_t>(fej9->getOffsetOfDiscontiguousDataAddrField() - fej9->getOffsetOfContiguousDataAddrField()));
-   cursor = generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, populateFirstDimDataAddrSlot);
-#else
-   cursor = generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, cFlowRegionEnd);
+      // Load dataAddr slot offset difference since 0 size arrays are treated as discontiguous.
+      generateRILInstruction(cg
+         , TR::InstOpCode::LGFI
+         , node
+         , temp1Reg
+         , static_cast<int32_t>(fej9->getOffsetOfDiscontiguousDataAddrField() - fej9->getOffsetOfContiguousDataAddrField()));
+      cursor = generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, populateFirstDimDataAddrSlot);
+      }
+   else
+      cursor = generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, cFlowRegionEnd);
 #endif /* TR_TARGET_64BIT */
    iComment("Init class field and jump.");
 
@@ -4854,17 +4861,20 @@ J9::Z::TreeEvaluator::multianewArrayEvaluator(TR::Node * node, TR::CodeGenerator
    TR::Register *temp3Reg = cg->allocateRegister();
 
 #if defined(TR_TARGET_64BIT)
-   // Populate dataAddr slot for 2nd dimension zero size array.
-   generateRXInstruction(cg
-      , TR::InstOpCode::LAY
-      , node
-      , temp3Reg
-      , generateS390MemoryReference(temp2Reg, TR::Compiler->om.discontiguousArrayHeaderSizeInBytes(), cg));
-   generateRXInstruction(cg
-      , TR::InstOpCode::STG
-      , node
-      , temp3Reg
-      , generateS390MemoryReference(temp2Reg, fej9->getOffsetOfDiscontiguousDataAddrField(), cg));
+   if (isIndexableDataAddrPresent)
+      {
+      // Populate dataAddr slot for 2nd dimension zero size array.
+      generateRXInstruction(cg
+         , TR::InstOpCode::LAY
+         , node
+         , temp3Reg
+         , generateS390MemoryReference(temp2Reg, TR::Compiler->om.discontiguousArrayHeaderSizeInBytes(), cg));
+      generateRXInstruction(cg
+         , TR::InstOpCode::STG
+         , node
+         , temp3Reg
+         , generateS390MemoryReference(temp2Reg, fej9->getOffsetOfDiscontiguousDataAddrField(), cg));
+      }
 #endif /* TR_TARGET_64BIT */
 
    // Store 2nd dim element into 1st dim array slot, compress temp2 if needed
@@ -4891,11 +4901,14 @@ J9::Z::TreeEvaluator::multianewArrayEvaluator(TR::Node * node, TR::CodeGenerator
    generateS390CompareAndBranchInstruction(cg, TR::InstOpCode::CL, node, firstDimLenReg, 0, TR::InstOpCode::COND_BNE, loopLabel, false);
 
 #if defined(TR_TARGET_64BIT)
-   // No offset is needed since 1st dimension array is contiguous.
-   generateRRInstruction(cg, TR::InstOpCode::getXORRegOpCode(), node, temp1Reg, temp1Reg);
-   generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, populateFirstDimDataAddrSlot);
-#else
-   generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, cFlowRegionEnd);
+   if (isIndexableDataAddrPresent)
+      {
+      // No offset is needed since 1st dimension array is contiguous.
+      generateRRInstruction(cg, TR::InstOpCode::getXORRegOpCode(), node, temp1Reg, temp1Reg);
+      generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, populateFirstDimDataAddrSlot);
+      }
+   else
+      generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, cFlowRegionEnd);
 #endif /* TR_TARGET_64BIT */
 
    TR::RegisterDependencyConditions *dependencies = generateRegisterDependencyConditions(0,10,cg);
@@ -4914,20 +4927,23 @@ J9::Z::TreeEvaluator::multianewArrayEvaluator(TR::Node * node, TR::CodeGenerator
    generateS390BranchInstruction(cg, TR::InstOpCode::BRC, TR::InstOpCode::COND_BRC, node, oolFailLabel);
 
 #if defined(TR_TARGET_64BIT)
-   /* Populate dataAddr slot of 1st dimension array. Arrays of non-zero size
-    * use contiguous header layout while zero size arrays use discontiguous header layout.
-    */
-   cursor = generateS390LabelInstruction(cg, TR::InstOpCode::label, node, populateFirstDimDataAddrSlot);
-   iComment("populateFirstDimDataAddrSlot.");
+   if (isIndexableDataAddrPresent)
+      {
+      /* Populate dataAddr slot of 1st dimension array. Arrays of non-zero size
+       * use contiguous header layout while zero size arrays use discontiguous header layout.
+       */
+      cursor = generateS390LabelInstruction(cg, TR::InstOpCode::label, node, populateFirstDimDataAddrSlot);
+      iComment("populateFirstDimDataAddrSlot.");
 
-   generateRXInstruction(cg, TR::InstOpCode::LAY
-      , node
-      , temp3Reg
-      , generateS390MemoryReference(targetReg, temp1Reg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg));
-   generateRXInstruction(cg, TR::InstOpCode::STG
-      , node
-      , temp3Reg
-      , generateS390MemoryReference(targetReg, temp1Reg, fej9->getOffsetOfContiguousDataAddrField(), cg));
+      generateRXInstruction(cg, TR::InstOpCode::LAY
+         , node
+         , temp3Reg
+         , generateS390MemoryReference(targetReg, temp1Reg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg));
+      generateRXInstruction(cg, TR::InstOpCode::STG
+         , node
+         , temp3Reg
+         , generateS390MemoryReference(targetReg, temp1Reg, fej9->getOffsetOfContiguousDataAddrField(), cg));
+      }
 #endif /* TR_TARGET_64BIT */
 
    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, cFlowRegionEnd, dependencies);
