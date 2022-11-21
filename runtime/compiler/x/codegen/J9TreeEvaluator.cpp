@@ -6025,8 +6025,14 @@ static void genHeapAlloc(
 #ifdef J9VM_INTERP_FLAGS_IN_CLASS_SLOT
          if ( (node->getOpCodeValue() == TR::anewarray || node->getOpCodeValue() == TR::newarray))
             {
-            // All arrays in combo builds will always be at least 20 bytes in size in all specs:
+            // All arrays in combo builds will always be at least 12 bytes in size in all specs if
+            // dual header shape is enabled and 20 bytes otherwise:
             //
+            // Dual header shape is enabled:
+            // 1)  class pointer + contig length + one or more elements
+            // 2)  class pointer + 0 + 0 (for zero length arrays)
+            //
+            // Dual header shape is disabled:
             // 1)  class pointer + contig length + dataAddr + one or more elements
             // 2)  class pointer + 0 + 0 (for zero length arrays) + dataAddr
             //
@@ -6863,12 +6869,20 @@ static void genInitArrayHeader(
    // for zero sized arrays we unconditionally store 0 in the third dword of the array object header. That is
    // safe because the 3rd dword is either array size of a zero sized array or will contain the first elements
    // of an array:
-   // - Zero sized arrays have the following layout:
+   // - When dual header shape is enabled zero sized arrays have the following layout:
    // - The smallest array possible is a byte array with 1 element which would have a layout:
+   //   #bits per section (compressed refs): | 32 bits |  32 bits   | 32 bits | 32 bits |   32 bits   |   32 bits    |
+   //   zero sized arrays:                   |  class  | mustBeZero |  size   | padding |            other           |
+   //   smallest contiguous array:           |  class  |    size    | padding |           other                      |
+   //   This also reflects the minimum object size which is 8 bytes.
+   //
+   // - When dual header shape is disabled zero sized arrays have the following layout:
    //   #bits per section (compressed refs): | 32 bits |  32 bits   | 32 bits | 32 bits |   32 bits   |   32 bits    |
    //   zero sized arrays:                   |  class  | mustBeZero |  size   | padding |          dataAddr          |
    //   smallest contiguous array:           |  class  |    size    |      dataAddr     | 1 byte + padding |  other  |
    //   This also reflects the minimum object size which is 16 bytes.
+   //
+   // Refere to J9IndexableObject(Dis)contiguousCompressed structs runtime/oti/j9nonbuilder.h for more detail
    int32_t arrayDiscontiguousSizeOffset = fej9->getOffsetOfDiscontiguousArraySizeField();
    TR::MemoryReference *arrayDiscontiguousSizeMR = generateX86MemoryReference(objectReg, arrayDiscontiguousSizeOffset, cg);
 
@@ -6981,22 +6995,27 @@ static bool genZeroInitObject2(
    bool isArrayNew = (node->getOpCodeValue() != TR::New);
    comp->canAllocateInline(node, clazz);
    auto headerSize = isArrayNew ? TR::Compiler->om.contiguousArrayHeaderSizeInBytes() : TR::Compiler->om.objectHeaderSizeInBytes();
-   // If we are using full refs both contiguous and discontiguous array header have the same size, in which case we must adjust header size
-   // slightly so that rep stosb can initialize the size field of zero sized arrays appropriately
-   //   #bits per section (compressed refs): | 32 bits |  32 bits   | 32 bits | 32 bits |   32 bits   |   32 bits    |
-   //   zero sized arrays:                   |  class  | mustBeZero |   size  | padding |          dataAddr          |
-   //   smallest contiguous array:           |  class  |    size    |      dataAddr     | 1 byte + padding |  other  |
-   //   In order for us to successfully initialize the size field of a zero sized array in compressed refs
-   //   we must subtract 8 bytes (sizeof(dataAddr)) from header size. And in case of full refs we must
-   //   subtract 16 bytes from the header in order to properly initialize the zero sized field. We can
-   //   accomplish that by simply subtracting the offset of dataAddr field, which is 8 for compressed refs
-   //   and 16 for full refs.
-#if defined(TR_TARGET_64BIT)
-   if (!cg->comp()->target().is32Bit() && isArrayNew)
+
+   // In order for us to successfully initialize the size field of a zero sized array
+   // we must set headerSize to 8 bytes for compressed refs and 12 bytes for full refs.
+   // This can be accomplished by using offset of discontiguous array size field.
+   // However, when dealing with compressed refs with dual header shape enabled we don't
+   // need to change the headerSize because contiguous header size is equal to the offset
+   // of discontiguous array size field.
+   // This allows rep stosb to initialize the size field of zero sized arrays appropriately.
+   //
+   // Refere to J9IndexableObject(Dis)contiguousCompressed structs in runtime/oti/j9nonbuilder.h for more detail
+   if (!cg->comp()->target().is32Bit() && isArrayNew
+         && (TR::Compiler->om.isIndexableDataAddrPresent() || !TR::Compiler->om.compressObjectReferences()))
       {
-      headerSize -= static_cast<TR_J9VMBase *>(cg->fe())->getOffsetOfContiguousDataAddrField();
+      TR_ASSERT_FATAL_WITH_NODE(node
+         , (cg->fej9()->getOffsetOfDiscontiguousArraySizeField() - cg->fe()->getOffsetOfContiguousArraySizeField()) == 4
+         , "Offset of size field in discontiguous array header is expected to be 4 bytes more than contiguous array header."
+           "But size field offset for contiguous array header was %d bytes and %d bytes for discontiguous array header.\n"
+         , cg->fe()->getOffsetOfContiguousArraySizeField(), cg->fe()->getOffsetOfDiscontiguousArraySizeField());
+
+      headerSize = static_cast<uint32_t>(cg->fej9()->getOffsetOfDiscontiguousArraySizeField());
       }
-#endif /* TR_TARGET_64BIT */
    TR_ASSERT(headerSize >= 4, "Object/Array header must be >= 4.");
    objectSize -= headerSize;
 
@@ -7448,7 +7467,7 @@ J9::X86::TreeEvaluator::VMnewEvaluator(
    // JVMPI needs to know about the allocation.
    //
    TR::Compilation *comp = cg->comp();
-   TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp->fe());
+   TR_J9VMBase *fej9 = comp->fej9();
 
    if (comp->suppressAllocationInlining())
       return NULL;
@@ -7917,9 +7936,10 @@ J9::X86::TreeEvaluator::VMnewEvaluator(
       {
       genInitObjectHeader(node, clazz, classReg, targetReg, tempReg, monitorSlotIsInitialized, false, cg);
       }
+
    TR::Register *discontiguousDataAddrOffsetReg = NULL;
 #ifdef TR_TARGET_64BIT
-   if (isArrayNew)
+   if (isArrayNew && TR::Compiler->om.isIndexableDataAddrPresent())
       {
       /* Here we'll update dataAddr slot for both fixed and variable length arrays. Fixed length arrays are
        * simple as we just need to check first child of the node for array size. For variable length arrays
@@ -7939,11 +7959,11 @@ J9::X86::TreeEvaluator::VMnewEvaluator(
          if (comp->getOption(TR_TraceCG))
             traceMsg(comp, "Node (%p): Dealing with compressed refs variable length array.\n", node);
 
-         TR_ASSERT_FATAL_WITH_NODE(node,
-               (fej9->getOffsetOfDiscontiguousDataAddrField() - fej9->getOffsetOfContiguousDataAddrField()) == 8,
-               "Offset of dataAddr field in discontiguous array is expected to be 8 bytes more than contiguous array. "
-               "But was %d bytes for discontigous and %d bytes for contiguous array.\n",
-               fej9->getOffsetOfDiscontiguousDataAddrField(), fej9->getOffsetOfContiguousDataAddrField());
+         TR_ASSERT_FATAL_WITH_NODE(node
+               , (fej9->getOffsetOfDiscontiguousDataAddrField() - fej9->getOffsetOfContiguousDataAddrField()) == 8
+               , "Offset of dataAddr field in discontiguous array is expected to be 8 bytes more than contiguous array. "
+                 "But was %d bytes for discontigous and %d bytes for contiguous array.\n"
+               , fej9->getOffsetOfDiscontiguousDataAddrField(), fej9->getOffsetOfContiguousDataAddrField());
 
          discontiguousDataAddrOffsetReg = cg->allocateRegister();
          generateRegRegInstruction(TR::InstOpCode::XORRegReg(), node, discontiguousDataAddrOffsetReg, discontiguousDataAddrOffsetReg, cg);
@@ -7964,19 +7984,19 @@ J9::X86::TreeEvaluator::VMnewEvaluator(
          {
          if (comp->getOption(TR_TraceCG))
             {
-            traceMsg(comp,
-               "Node (%p): Dealing with either full/compressed refs fixed length non-zero size array "
-               "or full refs variable length array.\n",
-               node);
+            traceMsg(comp
+               , "Node (%p): Dealing with either full/compressed refs fixed length non-zero size array "
+                 "or full refs variable length array.\n"
+               , node);
             }
 
          if (!TR::Compiler->om.compressObjectReferences())
             {
-            TR_ASSERT_FATAL_WITH_NODE(node,
-               fej9->getOffsetOfDiscontiguousDataAddrField() == fej9->getOffsetOfContiguousDataAddrField(),
-               "dataAddr field offset is expected to be same for both contiguous and discontiguous arrays in full refs. "
-               "But was %d bytes for discontiguous and %d bytes for contiguous array.\n",
-               fej9->getOffsetOfDiscontiguousDataAddrField(), fej9->getOffsetOfContiguousDataAddrField());
+            TR_ASSERT_FATAL_WITH_NODE(node
+               , fej9->getOffsetOfDiscontiguousDataAddrField() == fej9->getOffsetOfContiguousDataAddrField()
+               , "dataAddr field offset is expected to be same for both contiguous and discontiguous arrays in full refs. "
+                 "But was %d bytes for discontiguous and %d bytes for contiguous array.\n"
+               , fej9->getOffsetOfDiscontiguousDataAddrField(), fej9->getOffsetOfContiguousDataAddrField());
             }
 
          dataAddrMR = generateX86MemoryReference(targetReg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg);
