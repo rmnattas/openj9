@@ -8074,11 +8074,11 @@ J9::X86::TreeEvaluator::VMnewEvaluator(
 
          if (!TR::Compiler->om.compressObjectReferences())
             {
-            TR_ASSERT_FATAL_WITH_NODE(node,
-               fej9->getOffsetOfDiscontiguousDataAddrField() == fej9->getOffsetOfContiguousDataAddrField(),
-               "dataAddr field offset is expected to be same for both contiguous and discontiguous arrays in full refs. "
-               "But was %d bytes for discontiguous and %d bytes for contiguous array.\n",
-               fej9->getOffsetOfDiscontiguousDataAddrField(), fej9->getOffsetOfContiguousDataAddrField());
+            TR_ASSERT_FATAL_WITH_NODE(node
+               , fej9->getOffsetOfDiscontiguousDataAddrField() == fej9->getOffsetOfContiguousDataAddrField()
+               , "dataAddr field offset is expected to be same for both contiguous and discontiguous arrays in full refs. "
+                 "But was %d bytes for discontiguous and %d bytes for contiguous array.\n"
+               , fej9->getOffsetOfDiscontiguousDataAddrField(), fej9->getOffsetOfContiguousDataAddrField());
             }
 
          dataAddrMR = generateX86MemoryReference(targetReg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg);
