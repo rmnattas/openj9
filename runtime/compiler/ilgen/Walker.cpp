@@ -2068,6 +2068,9 @@ TR_J9ByteCodeIlGenerator::calculateElementAddressInContiguousArray(int32_t width
 void
 TR_J9ByteCodeIlGenerator::calculateElementAddressInContiguousArray(int32_t width)
    {
+   // TODO: fatal assert to make sure off heap allocation is enabled
+   // TODO: change method name to calculateElementAddressInContiguousArrayUsingDataAddrField
+
    traceMsg(comp(), "In calculateElementAddressInContiguousArray(int32_t)\n");
    const bool isForArrayAccess = true;
    int32_t shift = TR::TransformUtil::convertWidthToShift(width);
