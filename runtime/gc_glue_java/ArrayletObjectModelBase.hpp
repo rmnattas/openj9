@@ -48,12 +48,14 @@ protected:
 #if defined(OMR_GC_COMPRESSED_POINTERS) && defined(OMR_GC_FULL_POINTERS)
 	bool _compressObjectReferences;
 #endif /* defined(OMR_GC_COMPRESSED_POINTERS) && defined(OMR_GC_FULL_POINTERS) */
-	bool _enableVirtualLargeObjectHeap;
 	OMR_VM *_omrVM; 	/**< used so that we can pull the arrayletLeafSize and arrayletLeafLogSize for arraylet sizing calculations */
 	void * _arrayletRangeBase; /**< The base heap range of where discontiguous arraylets are allowed. */
 	void * _arrayletRangeTop; /**< The top heap range of where discontiguous arraylets are allowed. */
 	MM_MemorySubSpace * _arrayletSubSpace; /**< The only subspace that is allowed to have discontiguous arraylets. */
 	UDATA _largestDesirableArraySpineSize; /**< A cached copy of the subspace's _largestDesirableArraySpineSize to be used when we don't have access to a subspace. */
+#if defined(J9VM_ENV_DATA64)
+	bool _enableVirtualLargeObjectHeap;
+#endif /* J9VM_ENV_DATA64 */
 public:
 	typedef enum ArrayLayout {
 		Illegal = 0,
@@ -192,16 +194,22 @@ public:
 		}
 	}
 
+#if defined(J9VM_ENV_DATA64)
 	MMINLINE void
 	setEnableVirtualLargeObjectHeap(bool enableVirtualLargeObjectHeap)
 	{
 		_enableVirtualLargeObjectHeap = enableVirtualLargeObjectHeap;
 	}
+#endif /* J9VM_ENV_DATA64 */
 
 	MMINLINE bool
 	isVirtualLargeObjectHeapEnabled()
 	{
+#if defined(J9VM_ENV_DATA64)
 		return _enableVirtualLargeObjectHeap;
+#else /* J9VM_ENV_DATA64 */
+		return false;
+#endif /* J9VM_ENV_DATA64 */
 	}
 
 	/**

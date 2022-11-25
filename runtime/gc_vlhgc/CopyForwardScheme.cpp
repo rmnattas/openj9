@@ -2024,12 +2024,13 @@ MM_CopyForwardScheme::copy(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *
 				if (objectModel->isIndexable(destinationObjectPtr)) {
 					indexableObjectModel->fixupInternalLeafPointersAfterCopy((J9IndexableObject *)destinationObjectPtr, (J9IndexableObject *)forwardedHeader->getObject());
 
+#if defined(J9VM_ENV_DATA64)
 					/* If double mapping is enabled and the indexable object has been double mapped, there's no need to update the data pointer;
 					 * however, if either one of these statements is false than we must update it, because data pointer points to data within heap. */
 					bool shouldFixupDataAddr = !indexableObjectModel->isVirtualLargeObjectHeapEnabled();
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 					shouldFixupDataAddr = shouldFixupDataAddr && !indexableObjectModel->isDoubleMappingEnabled();
-#endif
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 					if (shouldFixupDataAddr ||  indexableObjectModel->shouldFixupDataAddr(_extensions, (J9IndexableObject *)destinationObjectPtr)) {
 						/* Updates internal data address of indexable objects. Every indexable object have a void *dataAddr
 						 * that always points to the array data. It will always point to the address right after the header,
@@ -2038,6 +2039,7 @@ MM_CopyForwardScheme::copy(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *
 						 * within heap. */
 						indexableObjectModel->fixupDataAddr(destinationObjectPtr);
 					}
+#endif /* J9VM_ENV_DATA64 */
 				}
 
 				objectModel->fixupHashFlagsAndSlot(forwardedHeader, destinationObjectPtr);

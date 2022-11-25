@@ -94,7 +94,9 @@ protected:
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	bool _includeDoubleMap; /**< Enables doublemap should the GC policy be balanced. Default is false. */
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+#if defined(J9VM_ENV_DATA64)
 	bool _includeVirtualLargeObjectHeap; /**< Enables scanning of objects that has been allocated at sparse heap. Default is false */
+#endif /* J9VM_ENV_DATA64 */
 	bool _trackVisibleStackFrameDepth; /**< Should the stack walker be told to track the visible frame depth. Default false, should set to true when doing JVMTI walks that report stack slots */
 
 	U_64 _entityStartScanTime; /**< The start time of the scan of the current scanning entity, or 0 if no entity is being scanned.  Defaults to 0. */
