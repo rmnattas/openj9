@@ -312,7 +312,9 @@ public:
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 		, _includeDoubleMap(_extensions->indexableObjectModel.isDoubleMappingEnabled())
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+#if defined(J9VM_ENV_DATA64)
 		, _includeVirtualLargeObjectHeap(_extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled())
+#endif /* J9VM_ENV_DATA64 */
 		, _trackVisibleStackFrameDepth(false)
 		, _entityStartScanTime(0)
 		, _entityIncrementStartTime(0)
