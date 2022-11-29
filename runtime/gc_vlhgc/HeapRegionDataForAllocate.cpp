@@ -200,10 +200,7 @@ MM_HeapRegionDataForAllocate::removeFromArrayletLeafList(MM_EnvironmentVLHGC *en
 
 	const UDATA arrayletLeafSize = env->getOmrVM()->_arrayletLeafSize;
 	void *leafAddress = _region->getLowAddress();
-	bool ret = extensions->heap->commitMemory(leafAddress, arrayletLeafSize);
-	if (!ret) {
-		printf("ERROR: Failed to recommit in-heap region. leafAddress: %p, arrayletLeafSize: %zu\n", leafAddress, arrayletLeafSize);
-	}
+	extensions->heap->commitMemory(leafAddress, arrayletLeafSize);
 
 	previous->_allocateData._nextArrayletLeafRegion = next;
 	if (NULL != next) {
