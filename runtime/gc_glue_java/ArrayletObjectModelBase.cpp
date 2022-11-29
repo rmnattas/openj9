@@ -36,8 +36,10 @@ GC_ArrayletObjectModelBase::initialize(MM_GCExtensionsBase * extensions)
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	_enableDoubleMapping = false;
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-	_enableVirtualLargeObjectHeap = false;
 	_largestDesirableArraySpineSize = UDATA_MAX;
+#if defined(J9VM_ENV_DATA64)
+	_enableVirtualLargeObjectHeap = false;
+#endif /* J9VM_ENV_DATA64 */
 
 	return true;
 }
