@@ -278,9 +278,9 @@ MM_VLHGCAccessBarrier::jniGetPrimitiveArrayCritical(J9VMThread* vmThread, jarray
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 		isAllIndexableDataContiguousEnabled = isAllIndexableDataContiguousEnabled || indexableObjectModel->isDoubleMappingEnabled();
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(vmThread);
 		if (isAllIndexableDataContiguousEnabled) {
 #if defined(J9VM_ENV_DATA64)
+			MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(vmThread);
 			fj9object_t *arrayoidPtr = indexableObjectModel->getArrayoidPointer(arrayObject);
 			if (indexableObjectModel->isArrayletDataDiscontiguous(arrayObject)) {
 				data = indexableObjectModel->getDataAddrForContiguous(arrayObject);
@@ -340,9 +340,9 @@ MM_VLHGCAccessBarrier::jniReleasePrimitiveArrayCritical(J9VMThread* vmThread, ja
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 		isAllIndexableDataContiguousEnabled = isAllIndexableDataContiguousEnabled || indexableObjectModel->isDoubleMappingEnabled();
 #endif
-		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(vmThread);
 		if (isAllIndexableDataContiguousEnabled) {
 #if defined(J9VM_ENV_DATA64)
+			MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(vmThread);
 			fj9object_t *arrayoidPtr = indexableObjectModel->getArrayoidPointer(arrayObject);
 			if (indexableObjectModel->isArrayletDataDiscontiguous(arrayObject)) {
 				void *data = NULL;
@@ -418,9 +418,9 @@ MM_VLHGCAccessBarrier::jniGetStringCritical(J9VMThread* vmThread, jstring str, j
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 		isAllIndexableDataContiguousEnabled = isAllIndexableDataContiguousEnabled || indexableObjectModel->isDoubleMappingEnabled();
 #endif
-		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(vmThread);
 		if (isAllIndexableDataContiguousEnabled) {
 #if defined(J9VM_ENV_DATA64)
+			MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(vmThread);
 			fj9object_t *arrayoidPtr = indexableObjectModel->getArrayoidPointer(valueObject);
 			if (indexableObjectModel->isArrayletDataDiscontiguous(valueObject)) {
 				data = (jchar *)indexableObjectModel->getDataAddrForContiguous(valueObject);
