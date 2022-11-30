@@ -333,7 +333,6 @@ MM_VerboseHandlerOutputVLHGC::outputMemoryInfoInnerStanza(MM_EnvironmentBase *en
 {
 	MM_VerboseWriterChain* writer = _manager->getWriterChain();
 	MM_CollectionStatisticsVLHGC *stats = MM_CollectionStatisticsVLHGC::getCollectionStatistics(statsBase);
-	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env->getOmrVM());
 
 	if (0 != stats->_edenHeapSize) {
 		writer->formatAndOutput(env, indent, "<mem type=\"eden\" free=\"%zu\" total=\"%zu\" percent=\"%zu\" />",
@@ -341,6 +340,7 @@ MM_VerboseHandlerOutputVLHGC::outputMemoryInfoInnerStanza(MM_EnvironmentBase *en
 				((UDATA)(((U_64)stats->_edenFreeHeapSize*100) / (U_64)stats->_edenHeapSize)));
 	}
 #if defined(J9VM_ENV_DATA64)
+	MM_GCExtensions *extensions = MM_GCExtensions::getExtensions(env->getOmrVM());
 	if (extensions->isVirtualLargeObjectHeapEnabled) {
 		writer->formatAndOutput(env, indent, "<mem type=\"offheap\" allocatedBytes=\"%zu\"/>",
 				extensions->largeObjectVirtualMemory->getSparseDataPool()->getFreeListPoolAllocBytes());
