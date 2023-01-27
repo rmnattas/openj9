@@ -905,11 +905,9 @@ int32_t TR_UnsafeFastPath::perform()
                // Calculate element address
 
                TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp()->fe());
-               J9JavaVM *vm = fej9->vmThread()->javaVM;
-               bool isOffHeapAllocationEnabled = vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm);
 
 #if defined(TR_TARGET_64BIT)
-               if (isArrayOperation && isOffHeapAllocationEnabled)
+               if (isArrayOperation && fej9->isOffHeapAllocationEnabled())
                   {
                   TR::Node *baseNodeForAdd = TR::TransformUtil::generateDataAddrLoadTrees(comp(), base);
                   TR::Node *newOffset = TR::Node::create(TR::ladd, 2, offset, TR::Node::lconst(-16));
