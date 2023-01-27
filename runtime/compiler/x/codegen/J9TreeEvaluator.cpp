@@ -9570,11 +9570,9 @@ static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGe
 
    bool use64BitClasses = comp->target().is64Bit() && !comp->useCompressedPointers();
 
-   J9JavaVM *vm = fej9->vmThread()->javaVM;
-   bool isOffHeapAllocationEnabled = vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm);
    TR::MemoryReference *objectFieldMR = NULL;
 #if defined(TR_TARGET_64BIT)
-   if (isArrayOperation && isOffHeapAllocationEnabled)
+   if (isArrayOperation && fej9->isOffHeapAllocationEnabled())
       {
       TR::Node *lshl = offsetNode->getFirstChild();
       TR::Node *i2l = lshl->getFirstChild();
@@ -13549,12 +13547,10 @@ uintptr_t
 J9::X86::TreeEvaluator::canUseArrayHeaderToAccessArrayData(TR::CodeGenerator *cg, TR::Node *node, TR::Register *arrayObjectReg, TR::Register *firstArrayElementReg)
    {
    TR_J9VMBase *fej9 = (TR_J9VMBase *)(cg->fe());
-   J9JavaVM *vm = fej9->vmThread()->javaVM;
-   bool isOffHeapAllocationEnabled = vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm);
    uintptr_t headerSize = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
 
 #ifdef TR_TARGET_64BIT
-   if (isOffHeapAllocationEnabled)
+   if (fej9->isOffHeapAllocationEnabled())
       {
       TR::MemoryReference *dataAddrSlotMR = generateX86MemoryReference(arrayObjectReg, fej9->getOffsetOfContiguousDataAddrField(), cg);
       // load address of the first element
