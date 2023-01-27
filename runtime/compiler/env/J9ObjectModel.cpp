@@ -367,7 +367,7 @@ J9::ObjectModel::isDiscontiguousArray(int32_t sizeInBytes)
     * allocation is enabled.
     */
    J9JavaVM *vm = TR::Compiler->javaVM;
-   if ((!vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm)
+   if ((!TR::Compiler->om.isOffHeapAllocationEnabled()
          && sizeInBytes > TR::Compiler->om.maxContiguousArraySizeInBytes())
       || (TR::Compiler->om.useHybridArraylets() && sizeInBytes == 0))
       return true;
@@ -390,8 +390,7 @@ J9::ObjectModel::isDiscontiguousArray(int32_t sizeInElements, int32_t elementSiz
     * heap. Hence, in addition to array size we must check if off heap
     * allocation is enabled.
     */
-   J9JavaVM *vm = TR::Compiler->javaVM;
-   if ((!vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm)
+   if ((!TR::Compiler->om.isOffHeapAllocationEnabled()
          && sizeInElements > maxContiguousArraySizeInElements)
       || (TR::Compiler->om.useHybridArraylets() && sizeInElements == 0))
       return true;
@@ -639,16 +638,13 @@ J9::ObjectModel::getAddressOfElement(TR::Compilation* comp, uintptr_t objectPoin
    TR_ASSERT(TR::Compiler->cls.isClassArray(comp, TR::Compiler->cls.objectClass(comp, (objectPointer))), "Object is not an array");
    TR_ASSERT(offset >= 0 && offset < TR::Compiler->om.getArrayLengthInBytes(comp, objectPointer), "Array is out of bound");
 
-   J9JavaVM *vm = TR::Compiler->javaVM;
-   bool isOffHeapAllocationEnabled = vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm);
-
    // If the array is contiguous, return the addition of objectPointer and offset
    int64_t totalOffset = offset;
    uintptr_t base = objectPointer;
    if (!TR::Compiler->om.isDiscontiguousArray(comp, objectPointer))
       {
 #if defined(TR_TARGET_64BIT)
-      if (isOffHeapAllocationEnabled)
+      if (TR::Compiler->om.isOffHeapAllocationEnabled())
          {
          /* If off heap allocation is enabled the data portion of
           * a contiguous array can be off heap. Hence, we can not
