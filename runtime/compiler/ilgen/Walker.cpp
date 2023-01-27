@@ -2186,7 +2186,7 @@ TR_J9ByteCodeIlGenerator::calculateArrayElementAddress(TR::DataType dataType, bo
    static bool enablePrints = (feGetEnv("sverma_EnablePrints") != NULL);
    // Stack is now ...,aryRef,index<===
 #if defined(TR_TARGET_64BIT)
-   if (fej9()->vmThread()->javaVM->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(fej9()->vmThread()->javaVM)
+   if (fej9()->isOffHeapAllocationEnabled()
       || enableDataAddrFieldLoad)
       {
       if (enablePrints)
