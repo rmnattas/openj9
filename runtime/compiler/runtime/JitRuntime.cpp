@@ -648,7 +648,7 @@ void J9FASTCALL _jitProfileStringValue(uintptr_t value, int32_t charsOffset, int
       J9JavaVM *jvm = jitConfig->javaVM;
       uintptr_t startOfData = 0;
 #if defined(TR_TARGET_64BIT)
-      if (jvm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(jvm))
+      if (TR::Compiler->om.isOffHeapAllocationEnabled())
          startOfData = *(uintptr_t *) (value + TR::Compiler->om.offsetOfContiguousDataAddrField());
       else
 #endif /* TR_TARGET_64BIT */
