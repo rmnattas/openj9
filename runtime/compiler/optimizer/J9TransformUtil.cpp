@@ -94,9 +94,8 @@ TR::Node *
 J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *arrayObject)
    {
    TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp->fe());
-   J9JavaVM *vm = fej9->vmThread()->javaVM;
    TR_ASSERT_FATAL_WITH_NODE(arrayObject
-      , vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm)
+      , fej9->isOffHeapAllocationEnabled()
       , "Off heap allocation is expected to be enabled but wasn't.\n");
 
    TR::SymbolReference *dataAddrFieldOffset = comp->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(fej9->getOffsetOfContiguousDataAddrField());
@@ -116,10 +115,8 @@ J9::TransformUtil::generateArrayAddressTrees(TR::Compilation *comp, TR::Node *ar
    // TODO_sverma: Add support for subtracting or adding offsetNode and header size
    //    Reference: https://github.com/eclipse-openj9/openj9/blob/master/runtime/compiler/optimizer/IdiomRecognitionUtils.cpp#L916
    TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp->fe());
-   J9JavaVM *vm = fej9->vmThread()->javaVM;
-   bool isOffHeapAllocationEnabled = vm->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(vm);
 #if defined(TR_TARGET_64BIT)
-   if (isOffHeapAllocationEnabled)
+   if (fej9->isOffHeapAllocationEnabled())
       {
       arrayAddressNode = generateDataAddrLoadTrees(comp, arrayNode);
       if (offsetNode)
