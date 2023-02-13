@@ -79,8 +79,9 @@ J9::ObjectModel::initialize()
    result = mmf->j9gc_modron_getConfigurationValueForKey(vm,
                                                          j9gc_modron_configuration_discontiguousArraylets,
                                                          &value);
+   static bool disableArraylets = (feGetEnv("TR_svermaDisableArraylets") != NULL);
    bool isOffHeapAllocationEnabled = mmf->j9gc_off_heap_allocation_enabled(vm);
-   if (result == 1 && value == 1 && !isOffHeapAllocationEnabled)
+   if (result == 1 && value == 1 && !isOffHeapAllocationEnabled && !disableArraylets)
       {
       _usesDiscontiguousArraylets = true;
       _arrayLetLeafSize = (int32_t)(vm->memoryManagerFunctions->j9gc_arraylet_getLeafSize(vm));
