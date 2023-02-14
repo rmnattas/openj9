@@ -79,7 +79,7 @@ J9::ObjectModel::initialize()
    result = mmf->j9gc_modron_getConfigurationValueForKey(vm,
                                                          j9gc_modron_configuration_discontiguousArraylets,
                                                          &value);
-   static bool disableArraylets = (feGetEnv("TR_svermaDisableArraylets") != NULL);
+   static bool disableArraylets = true;
    bool isOffHeapAllocationEnabled = mmf->j9gc_off_heap_allocation_enabled(vm);
    if (result == 1 && value == 1 && !isOffHeapAllocationEnabled && !disableArraylets)
       {
