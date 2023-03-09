@@ -187,7 +187,12 @@ J9::ObjectModel::isOffHeapAllocationEnabled()
       return vmInfo->_isOffHeapAllocationEnabled;
       }
 #endif /* defined(J9VM_OPT_JITSERVER) */
+
+#if defined(TR_TARGET_64BIT)
    return TR::Compiler->javaVM->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(TR::Compiler->javaVM);
+#else /* !defined(TR_TARGET_64BIT) */
+	return FALSE;
+#endif /* defined(TR_TARGET_64BIT) */
    }
 
 
