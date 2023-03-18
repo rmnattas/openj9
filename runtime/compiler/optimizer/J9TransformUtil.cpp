@@ -147,6 +147,7 @@ J9::TransformUtil::generateArrayAddressTrees(TR::Compilation *comp, TR::Node *ar
          totalOffsetNode = TR::Node::create(TR::iadd, 2, offsetNode, totalOffsetNode);
       arrayAddressNode = TR::Node::create(TR::aiadd, 2, arrayNode, totalOffsetNode);
       }
+   // TODO_sverma: should we be marking arrayAddressNode as internal pointer?
 
    return arrayAddressNode;
    }
