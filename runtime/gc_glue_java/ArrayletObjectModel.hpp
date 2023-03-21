@@ -841,6 +841,7 @@ public:
 	MMINLINE void **
 	dataAddrSlotForContiguous(J9IndexableObject *arrayPtr)
 	{
+		//AssertContiguousArrayletLayout(arrayPtr);
 		bool const compressed = compressObjectReferences();
 		void **dataAddrPtr = NULL;
 		if (compressed) {
