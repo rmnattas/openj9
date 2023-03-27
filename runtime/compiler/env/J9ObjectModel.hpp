@@ -99,6 +99,7 @@ public:
 
    bool generateCompressedObjectHeaders();
 
+   // TODO_sverma: do we need usesDiscontiguousArraylets and canGenerateArraylets??
    bool usesDiscontiguousArraylets();
    bool canGenerateArraylets() { return usesDiscontiguousArraylets(); }
    bool useHybridArraylets() { return usesDiscontiguousArraylets(); }
