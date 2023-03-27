@@ -1773,7 +1773,7 @@ Candidate *TR_EscapeAnalysis::createCandidateIfValid(TR::Node *node, TR_OpaqueCl
 
 
    if (comp()->cg()->getSupportsStackAllocationOfArraylets())
-      {
+      { // TODO_sverma: how will this work for off heap arrays?
       if (node->getOpCodeValue() != TR::New)
          {
          if (trace())
