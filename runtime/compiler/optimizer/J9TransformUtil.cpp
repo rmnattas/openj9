@@ -90,6 +90,7 @@ J9::TransformUtil::generateArrayElementShiftAmountTrees(
    }
 
 #if defined(TR_TARGET_64BIT)
+// Generates IL trees to load dataAddr field from array header
 TR::Node *
 J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *arrayObject)
    {
@@ -106,11 +107,16 @@ J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *ar
    }
 #endif /* TR_TARGET_64BIT */
 
+// Generates IL trees for array access. It accepts offset in bytes and array base node
 TR::Node *
 J9::TransformUtil::generateArrayAddressTrees(TR::Compilation *comp, TR::Node *arrayNode, TR::Node *offsetNode)
    {
    TR::Node *arrayAddressNode = NULL;
    TR::Node *totalOffsetNode = NULL;
+
+   TR_ASSERT_FATAL_WITH_NODE(arrayNode
+      , !TR::Compiler->om.canGenerateArraylets()
+      , "This helper shouldn't be called if arraylets are enabled.\n");
 
    // TODO_sverma: Add support for subtracting or adding offsetNode and header size
    //    Reference: https://github.com/eclipse-openj9/openj9/blob/master/runtime/compiler/optimizer/IdiomRecognitionUtils.cpp#L916
@@ -144,6 +150,7 @@ J9::TransformUtil::generateArrayAddressTrees(TR::Compilation *comp, TR::Node *ar
    return arrayAddressNode;
    }
 
+// Generates IL trees to access first array element. It accepts array base node
 TR::Node *
 J9::TransformUtil::generateArrayStartTrees(TR::Compilation *comp, TR::Node *arrayObject)
    {
@@ -151,6 +158,7 @@ J9::TransformUtil::generateArrayStartTrees(TR::Compilation *comp, TR::Node *arra
    return firstArrayElementNode;
    }
 
+// Generates IL trees to convert element index to offset in bytes. It accepts index node, stride node or element size
 TR::Node *
 J9::TransformUtil::generateArrayOffsetTrees(TR::Compilation *comp, TR::Node *indexNode, TR::Node *strideNode, int32_t elementSize, bool useShiftOpCode)
    {
@@ -186,6 +194,7 @@ J9::TransformUtil::generateArrayOffsetTrees(TR::Compilation *comp, TR::Node *ind
    return offsetNode;
    }
 
+// Returns array element index node from array access IL trees
 TR::Node *
 J9::TransformUtil::findArrayIndexNode(TR::Compilation *comp, TR::Node *loadNode)
    {
@@ -234,6 +243,7 @@ J9::TransformUtil::findArrayIndexNode(TR::Compilation *comp, TR::Node *loadNode)
    return indexNode;
    }
 
+// Returns array base node from array access IL trees
 TR::Node *
 J9::TransformUtil::findArrayBaseNode(TR::Compilation *comp, TR::Node *loadNode)
    {
