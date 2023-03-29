@@ -101,7 +101,7 @@ J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *ar
    TR::SymbolReference *dataAddrFieldOffset = comp->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(fej9->getOffsetOfContiguousDataAddrField());
    TR::Node *dataAddrField = TR::Node::createWithSymRef(TR::aloadi, 1, arrayObject, 0, dataAddrFieldOffset);
    dataAddrField->setIsDataAddrPointer(true);
-   dataAddrField->setIsInternalPointer(true);
+   // dataAddrField->setIsInternalPointer(true);
 
    return dataAddrField;
    }
@@ -122,6 +122,8 @@ J9::TransformUtil::generateArrayAddressTrees(TR::Compilation *comp, TR::Node *ar
       arrayAddressNode = generateDataAddrLoadTrees(comp, arrayNode);
       if (offsetNode)
          arrayAddressNode = TR::Node::create(TR::aladd, 2, arrayAddressNode, offsetNode);
+      else
+         arrayAddressNode = TR::Node::create(TR::aladd, 2, arrayAddressNode, TR::Node::lconst(0));
       }
    else if (comp->target().is64Bit())
 #else
