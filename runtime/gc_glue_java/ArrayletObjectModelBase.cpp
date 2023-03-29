@@ -38,6 +38,7 @@ GC_ArrayletObjectModelBase::initialize(MM_GCExtensionsBase * extensions)
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 	_largestDesirableArraySpineSize = UDATA_MAX;
 #if defined(J9VM_ENV_DATA64)
+	_enableVirtualLargeObjectHeap = false;
 	_isIndexableDataAddrPresent = false;
 #endif /* defined(J9VM_ENV_DATA64) */
 	_contiguousIndexableHeaderSize = 0;
@@ -99,19 +100,23 @@ GC_ArrayletObjectModelBase::getSpineSizeWithoutHeader(ArrayLayout layout, UDATA 
 			spineArrayoidSize = numberArraylets * slotSize;
 		}
 	}
+	bool isAllIndexableDataContiguousEnabled = extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled();
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+	isAllIndexableDataContiguousEnabled = (isAllIndexableDataContiguousEnabled || extensions->indexableObjectModel.isDoubleMappingEnabled());
+#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+
 	UDATA spineDataSize = 0;
 	if (InlineContiguous == layout) {
 		spineDataSize = dataSize; // All data in spine
-	} else if (Hybrid == layout) {
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-		if (extensions->indexableObjectModel.isDoubleMappingEnabled()) {
+		if (isAllIndexableDataContiguousEnabled && (!extensions->indexableObjectModel.isArrayletDataAdjacentToHeader(dataSize))) {
 			spineDataSize = 0;
-		} else
-#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
-		{
-			/* Last arraylet in spine */
-			spineDataSize = (dataSize & (_omrVM->_arrayletLeafSize - 1));
 		}
+	} else if (Hybrid == layout) {
+		if (isAllIndexableDataContiguousEnabled) {
+			extensions->indexableObjectModel.AssertContiguousArrayDataUnreachable();
+		}
+		/* Last arraylet in spine */
+		spineDataSize = (dataSize & (_omrVM->_arrayletLeafSize - 1));
 	}
 
 	return spinePaddingSize + spineArrayoidSize + spineDataSize;

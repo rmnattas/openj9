@@ -210,26 +210,36 @@ public:
 	postObjectMoveForCompact(omrobjectptr_t destinationObjectPtr, omrobjectptr_t sourceObjectPtr)
 	{
 		GC_ObjectModel *objectModel = &_extensions->objectModel;
+		GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
 		if (_gcEnv.movedObjectHashCodeCache.hasBeenHashed && !_gcEnv.movedObjectHashCodeCache.hasBeenMoved) {
 			*(uint32_t*)((uintptr_t)destinationObjectPtr + objectModel->getHashcodeOffset(destinationObjectPtr)) = _gcEnv.movedObjectHashCodeCache.originalHashCode;
 			objectModel->setObjectHasBeenMoved(destinationObjectPtr);
 		}
 
-		if (_extensions->objectModel.isIndexable(destinationObjectPtr)) {
+		if (objectModel->isIndexable(destinationObjectPtr)) {
 #if defined(J9VM_ENV_DATA64)
 			if (_vmThread->isIndexableDataAddrPresent) {
+				/* If double mapping or off-heap is enabled and the indexable object has been double mapped, there's no need to update the data pointer.
+				 * However, if either one of these statements is false than we must update it, because data pointer points to data within heap.
+				 */
+				bool shouldFixupDataAddr = !indexableObjectModel->isVirtualLargeObjectHeapEnabled();
+	#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+				shouldFixupDataAddr = shouldFixupDataAddr && !indexableObjectModel->isDoubleMappingEnabled();
+	#endif /* defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
+				if (shouldFixupDataAddr || indexableObjectModel->shouldFixupDataAddr(_extensions, (J9IndexableObject *)destinationObjectPtr)) {
 				/**
 				 * Update the dataAddr internal field of the indexable object. The field being updated
 				 * points to the array data. In the case of contiguous data, it will point to the data
 				 * itself, and in case of discontiguous arraylets, it will point to the first arrayoid. How to
 				 * update dataAddr is up to the target language that must override fixupDataAddr.
 				 */
-				_extensions->indexableObjectModel.fixupDataAddr(destinationObjectPtr);
+					indexableObjectModel->fixupDataAddr(destinationObjectPtr);
+				}
 			}
 #endif /* defined(J9VM_ENV_DATA64) */
 
 			if (UDATA_MAX != _extensions->getOmrVM()->_arrayletLeafSize) {
-				_extensions->indexableObjectModel.fixupInternalLeafPointersAfterCopy((J9IndexableObject *)destinationObjectPtr, (J9IndexableObject *)sourceObjectPtr);
+				indexableObjectModel->fixupInternalLeafPointersAfterCopy((J9IndexableObject *)destinationObjectPtr, (J9IndexableObject *)sourceObjectPtr);
 			}
 		}
 	}

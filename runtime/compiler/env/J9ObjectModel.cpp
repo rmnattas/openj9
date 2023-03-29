@@ -175,6 +175,19 @@ J9::ObjectModel::isHotReferenceFieldRequired()
    return TR::Compiler->javaVM->memoryManagerFunctions->j9gc_hot_reference_field_required(TR::Compiler->javaVM);
    }
 
+bool
+J9::ObjectModel::isOffHeapAllocationEnabled()
+   {
+#if defined(J9VM_OPT_JITSERVER)
+   if (auto stream = TR::CompilationInfo::getStream())
+      {
+      auto *vmInfo = TR::compInfoPT->getClientData()->getOrCacheVMInfo(stream);
+      return vmInfo->_isOffHeapAllocationEnabled;
+      }
+#endif /* defined(J9VM_OPT_JITSERVER) */
+   return TR::Compiler->javaVM->memoryManagerFunctions->j9gc_off_heap_allocation_enabled(TR::Compiler->javaVM);
+   }
+
 
 UDATA
 J9::ObjectModel::elementSizeOfBooleanArray()
@@ -315,6 +328,7 @@ J9::ObjectModel::contiguousArrayHeaderSizeInBytes()
       }
 #endif /* defined(J9VM_OPT_JITSERVER) */
    return TR::Compiler->javaVM->contiguousIndexableHeaderSize;
+   return TR::Compiler->javaVM->contiguousIndexableHeaderSize;
    }
 
 
@@ -328,6 +342,7 @@ J9::ObjectModel::discontiguousArrayHeaderSizeInBytes()
       return vmInfo->_discontiguousIndexableHeaderSize;
       }
 #endif /* defined(J9VM_OPT_JITSERVER) */
+   return TR::Compiler->javaVM->discontiguousIndexableHeaderSize;
    return TR::Compiler->javaVM->discontiguousIndexableHeaderSize;
    }
 
