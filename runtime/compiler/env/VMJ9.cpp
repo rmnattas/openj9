@@ -2408,6 +2408,16 @@ TR_J9VMBase::isHotReferenceFieldRequired()
    return TR::Compiler->om.isHotReferenceFieldRequired();
    }
 
+/**
+ * Query if off-heap large array allocation is enabled
+ *  @return true if off-heap large array allocation is enabled, false otherwise
+ */
+bool
+TR_J9VMBase::isOffHeapAllocationEnabled()
+   {
+   return TR::Compiler->om.isOffHeapAllocationEnabled();
+   }
+
 bool
 TR_J9VMBase::scanReferenceSlotsInClassForOffset(TR::Compilation * comp, TR_OpaqueClassBlock * classPointer, int32_t offset)
    {

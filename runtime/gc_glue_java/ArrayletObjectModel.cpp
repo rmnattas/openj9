@@ -25,6 +25,7 @@
 #include "GCExtensionsBase.hpp"
 #include "ModronAssertions.h"
 #include "ObjectModel.hpp"
+#include "Heap.hpp"
 
 bool
 GC_ArrayletObjectModel::initialize(MM_GCExtensionsBase *extensions)
@@ -45,17 +46,25 @@ GC_ArrayletObjectModel::AssertBadElementSize()
 }
 
 void
+GC_ArrayletObjectModel::AssertContiguousArrayDataUnreachable()
+{
+	Assert_MM_unreachable();
+}
+
+void
 GC_ArrayletObjectModel::AssertArrayletIsDiscontiguous(J9IndexableObject *objPtr)
 {
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 	if (!isDoubleMappingEnabled())
-#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
+#endif /* defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
 	{
-		MM_GCExtensionsBase* extensions = MM_GCExtensionsBase::getExtensions(_omrVM);
-		UDATA arrayletLeafSize = _omrVM->_arrayletLeafSize;
-		UDATA remainderBytes = getDataSizeInBytes(objPtr) % arrayletLeafSize;
-		if (0 != remainderBytes) {
-			Assert_MM_true((getSpineSize(objPtr) + remainderBytes + extensions->getObjectAlignmentInBytes()) > arrayletLeafSize);
+		if (!isVirtualLargeObjectHeapEnabled()) {
+			UDATA arrayletLeafSize = _omrVM->_arrayletLeafSize;
+			UDATA remainderBytes = getDataSizeInBytes(objPtr) % arrayletLeafSize;
+			if (0 != remainderBytes) {
+				MM_GCExtensionsBase* extensions = MM_GCExtensionsBase::getExtensions(_omrVM);
+				Assert_MM_true((getSpineSize(objPtr) + remainderBytes + extensions->getObjectAlignmentInBytes()) > arrayletLeafSize);
+			}
 		}
 	}
 }
@@ -102,7 +111,13 @@ GC_ArrayletObjectModel::getArrayletLayout(J9Class* clazz, UDATA dataSizeInBytes,
 		UDATA arrayletLeafSize = _omrVM->_arrayletLeafSize;
 		UDATA lastArrayletBytes = dataSizeInBytes & (arrayletLeafSize - 1);
 
-		if (lastArrayletBytes > 0) {
+		bool isAllIndexableDataContiguousEnabled = isVirtualLargeObjectHeapEnabled();
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+		isAllIndexableDataContiguousEnabled = isAllIndexableDataContiguousEnabled || isDoubleMappingEnabled();
+#endif /* defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
+		if (isAllIndexableDataContiguousEnabled && (0 < dataSizeInBytes)) {
+			layout = InlineContiguous;
+		} else if (lastArrayletBytes > 0) {
 			/* determine how large the spine would be if this were a hybrid array */
 			UDATA numberArraylets = numArraylets(dataSizeInBytes);
 			bool align = shouldAlignSpineDataSection(clazz);
@@ -112,11 +127,6 @@ GC_ArrayletObjectModel::getArrayletLayout(J9Class* clazz, UDATA dataSizeInBytes,
 			if (extensions->isVLHGC()) {
 				adjustedHybridSpineBytesAfterMove += objectAlignmentInBytes;
 			}
-#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
-			if (extensions->indexableObjectModel.isDoubleMappingEnabled()) {
-				layout = Discontiguous;
-			} else
-#endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 			/* if remainder data can fit in spine, make it hybrid */
 			if (adjustedHybridSpineBytesAfterMove <= largestDesirableSpine) {
 				/* remainder data can fit in spine, last arrayoid pointer points to empty data section in spine */
@@ -150,6 +160,53 @@ GC_ArrayletObjectModel::fixupInternalLeafPointersAfterCopy(J9IndexableObject *de
 			}
 		}
 	}
+}
+
+bool
+GC_ArrayletObjectModel::isArrayletDataAdjacentToHeader(J9IndexableObject *arrayPtr)
+{
+	UDATA dataSizeInBytes = getDataSizeInBytes(arrayPtr);
+	return isArrayletDataAdjacentToHeader(dataSizeInBytes);
+}
+
+bool
+GC_ArrayletObjectModel::isArrayletDataAdjacentToHeader(UDATA dataSizeInBytes)
+{
+	MM_GCExtensionsBase* extensions = MM_GCExtensionsBase::getExtensions(_omrVM);
+	UDATA minimumSpineSizeAfterGrowing = extensions->getObjectAlignmentInBytes();
+	return ((UDATA_MAX == _largestDesirableArraySpineSize) || (dataSizeInBytes <= (_largestDesirableArraySpineSize - minimumSpineSizeAfterGrowing - contiguousIndexableHeaderSize())));
+}
+
+bool
+GC_ArrayletObjectModel::isAddressWithinHeap(MM_GCExtensionsBase *extensions, void *address)
+{
+	UDATA heapBase = (UDATA)extensions->heap->getHeapBase();
+	UDATA heapTop = (UDATA)extensions->heap->getHeapTop();
+	return ((UDATA)address >= heapBase) && ((UDATA)address < heapTop);
+}
+bool
+GC_ArrayletObjectModel::isIndexableObjectDoubleMapped(MM_GCExtensionsBase *extensions, J9IndexableObject *arrayPtr)
+{
+#if defined(J9VM_ENV_DATA64)
+	void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
+	bool isObjectWithinHeap = isAddressWithinHeap(extensions, dataAddr);
+	return ((getDataSizeInBytes(arrayPtr) >= _omrVM->_arrayletLeafSize) && (!isObjectWithinHeap));
+
+#else /* defined(J9VM_ENV_DATA64) */
+	return false;
+#endif /* defined(J9VM_ENV_DATA64) */
+}
+
+bool
+GC_ArrayletObjectModel::shouldFixupDataAddr(MM_GCExtensionsBase *extensions, J9IndexableObject *arrayPtr)
+{
+#if defined(J9VM_ENV_DATA64)
+	void *dataAddr = getDataAddrForIndexableObject(arrayPtr);
+	return isAddressWithinHeap(extensions, dataAddr);
+
+#else /* defined(J9VM_ENV_DATA64) */
+	return false;
+#endif /* defined(J9VM_ENV_DATA64) */
 }
 
 #if defined(J9VM_ENV_DATA64)
