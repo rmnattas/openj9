@@ -99,6 +99,10 @@ J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *ar
       , fej9->isOffHeapAllocationEnabled()
       , "Off heap allocation is expected to be enabled but wasn't.\n");
 
+   TR_ASSERT_FATAL_WITH_NODE(arrayObject
+      , !TR::Compiler->om.canGenerateArraylets()
+      , "This helper shouldn't be called if arraylets are enabled.\n");
+
    TR::SymbolReference *dataAddrFieldOffset = comp->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(fej9->getOffsetOfContiguousDataAddrField());
    TR::Node *dataAddrField = TR::Node::createWithSymRef(TR::aloadi, 1, arrayObject, 0, dataAddrFieldOffset);
    dataAddrField->setIsDataAddrPointer(true);
@@ -113,10 +117,6 @@ J9::TransformUtil::generateArrayAddressTrees(TR::Compilation *comp, TR::Node *ar
    {
    TR::Node *arrayAddressNode = NULL;
    TR::Node *totalOffsetNode = NULL;
-
-   TR_ASSERT_FATAL_WITH_NODE(arrayNode
-      , !TR::Compiler->om.canGenerateArraylets()
-      , "This helper shouldn't be called if arraylets are enabled.\n");
 
    // TODO_sverma: Add support for subtracting or adding offsetNode and header size
    //    Reference: https://github.com/eclipse-openj9/openj9/blob/master/runtime/compiler/optimizer/IdiomRecognitionUtils.cpp#L916
