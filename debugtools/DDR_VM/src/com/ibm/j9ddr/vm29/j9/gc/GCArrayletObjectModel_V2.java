@@ -87,10 +87,10 @@ class GCArrayletObjectModel_V2 extends GCArrayletObjectModelBase
 		boolean isValidDataAddrForDoubleMappedObject = isIndexableObjectDoubleMapped(dataAddr, dataSizeInBytes);
 
 		if (dataSizeInBytes.isZero()) {
-			VoidPointer discontiguousDataAddr = VoidPointer.cast(array.addOffset(J9IndexableObjectHelper.discontiguousHeaderSize()));
+			VoidPointer discontiguousDataAddr = VoidPointer.cast(arrayPtr.addOffset(J9IndexableObjectHelper.discontiguousHeaderSize()));
 			isCorrectDataAddrPointer = (dataAddr.isNull() || dataAddr.equals(discontiguousDataAddr));
-		} else if (dataSizeInBytes.lt(_javaVM.arrayletLeafSize())) {
-			VoidPointer contiguousDataAddr = VoidPointer.cast(array.addOffset(J9IndexableObjectHelper.contiguousHeaderSize()));
+		} else if (dataSizeInBytes.lt(arrayletLeafSize)) {
+			VoidPointer contiguousDataAddr = VoidPointer.cast(arrayPtr.addOffset(J9IndexableObjectHelper.contiguousHeaderSize()));
 			isCorrectDataAddrPointer = dataAddr.equals(contiguousDataAddr);
 		} else {
 			if (enableVirtualLargeObjectHeap || enableDoubleMapping) {
