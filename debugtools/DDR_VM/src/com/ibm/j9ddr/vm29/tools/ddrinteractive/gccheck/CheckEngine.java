@@ -253,24 +253,19 @@ class CheckEngine
 			try {
 				fieldIterator = GCObjectIterator.fromJ9Object(object, true);
 				addressIterator = GCObjectIterator.fromJ9Object(object, true);
-
-				if ((false == ObjectModel.isIndexable(object))
-					&& ObjectModel.isInlineContiguousArraylet(J9IndexableObjectPointer.cast(object))
-					&& ObjectModel.getDataSizeInBytes(J9IndexableObjectPointer.cast(object)).gte(_javaVM.arrayletLeafSize())) {
-					while (fieldIterator.hasNext()) {
-						J9ObjectPointer field = fieldIterator.next();
-						VoidPointer address = addressIterator.nextAddress();
-						result = checkSlotObjectHeap(field, ObjectReferencePointer.cast(address), regionDesc, object);
-						if(J9MODRON_SLOT_ITERATOR_OK != result) {
-							break;
-						}
-					}
-				}
 			} catch (CorruptDataException e) {
 				// TODO : cde should be part of the error
 				CheckError error = new CheckError(object, _cycle, _currentCheck, "Object ", J9MODRON_GCCHK_RC_CORRUPT_DATA_EXCEPTION, _cycle.nextErrorCount());
 				_reporter.report(error);
 				return J9MODRON_SLOT_ITERATOR_UNRECOVERABLE_ERROR;
+			}
+			while (fieldIterator.hasNext()) {
+				J9ObjectPointer field = fieldIterator.next();
+				VoidPointer address = addressIterator.nextAddress();
+				result = checkSlotObjectHeap(field, ObjectReferencePointer.cast(address), regionDesc, object);
+				if(J9MODRON_SLOT_ITERATOR_OK != result) {
+					break;
+				}
 			}
 		}
 		
