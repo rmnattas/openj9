@@ -1202,7 +1202,7 @@ class CheckEngine
 
 		try {
 			if (J9BuildFlags.env_data64 && isIndexableDataAddressFlagSet() && ObjectModel.isIndexable(object)) {
-				if (!_javaVM.isIndexableDataAddrPresent().isZero()) {
+				if (GCExtensions.isVLHGC() && !_javaVM.isIndexableDataAddrPresent().isZero()) {
 					J9IndexableObjectPointer array = J9IndexableObjectPointer.cast(object);
 				
 					if (false == J9IndexableObjectHelper.isCorrectDataAddrPointer(array)) {
