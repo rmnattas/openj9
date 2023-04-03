@@ -707,6 +707,20 @@ J9::ObjectModel::arrayletLeafLogSize()
    return _arrayLetLeafLogSize;
    }
 
+/**
+ * Query if the indexable data address field is present within the indexable object header.
+ * @return true if isIndexableDualHeaderShapeEnabled is false OR if option -Xgcpolicy:balanced is specified at runtime, false otherwise
+ */
+bool
+J9::ObjectModel::isIndexableDataAddrPresent()
+   {
+#if defined(J9VM_ENV_DATA64)
+   return FALSE != TR::Compiler->javaVM->isIndexableDataAddrPresent;
+#else
+   return false;
+#endif /* defined(J9VM_ENV_DATA64) */
+   }
+
 MM_GCReadBarrierType
 J9::ObjectModel::readBarrierType()
    {
