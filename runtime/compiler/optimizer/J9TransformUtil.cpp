@@ -94,7 +94,7 @@ J9::TransformUtil::generateArrayElementShiftAmountTrees(
 TR::Node *
 J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *arrayObject)
    {
-   TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp->fe());
+   TR_J9VMBase *fej9 = comp->fej9();
    TR_ASSERT_FATAL_WITH_NODE(arrayObject
       , fej9->isOffHeapAllocationEnabled()
       , "Off heap allocation is expected to be enabled but wasn't.\n");
@@ -120,7 +120,8 @@ J9::TransformUtil::generateArrayAddressTrees(TR::Compilation *comp, TR::Node *ar
 
    // TODO_sverma: Add support for subtracting or adding offsetNode and header size
    //    Reference: https://github.com/eclipse-openj9/openj9/blob/master/runtime/compiler/optimizer/IdiomRecognitionUtils.cpp#L916
-   TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp->fe());
+   // TODO_sverma: The query can be accessed through object model
+   TR_J9VMBase *fej9 = comp->fej9();
 #if defined(TR_TARGET_64BIT)
    if (fej9->isOffHeapAllocationEnabled())
       {
