@@ -307,6 +307,13 @@ J9::ObjectModel::generateCompressedObjectHeaders()
 uintptr_t
 J9::ObjectModel::contiguousArrayHeaderSizeInBytes()
    {
+#if defined(J9VM_OPT_JITSERVER)
+   if (auto stream = TR::CompilationInfo::getStream())
+      {
+      auto *vmInfo = TR::compInfoPT->getClientData()->getOrCacheVMInfo(stream);
+      return vmInfo->_contiguousIndexableHeaderSize;
+      }
+#endif /* defined(J9VM_OPT_JITSERVER) */
    return TR::Compiler->javaVM->contiguousIndexableHeaderSize;
    }
 
@@ -314,6 +321,13 @@ J9::ObjectModel::contiguousArrayHeaderSizeInBytes()
 uintptr_t
 J9::ObjectModel::discontiguousArrayHeaderSizeInBytes()
    {
+#if defined(J9VM_OPT_JITSERVER)
+   if (auto stream = TR::CompilationInfo::getStream())
+      {
+      auto *vmInfo = TR::compInfoPT->getClientData()->getOrCacheVMInfo(stream);
+      return vmInfo->_discontiguousIndexableHeaderSize;
+      }
+#endif /* defined(J9VM_OPT_JITSERVER) */
    return TR::Compiler->javaVM->discontiguousIndexableHeaderSize;
    }
 
@@ -714,6 +728,13 @@ J9::ObjectModel::arrayletLeafLogSize()
 bool
 J9::ObjectModel::isIndexableDataAddrPresent()
    {
+#if defined(J9VM_OPT_JITSERVER)
+   if (auto stream = TR::CompilationInfo::getStream())
+      {
+      auto *vmInfo = TR::compInfoPT->getClientData()->getOrCacheVMInfo(stream);
+      return vmInfo->_isIndexableDataAddrPresent;
+      }
+#endif /* defined(J9VM_OPT_JITSERVER) */
 #if defined(J9VM_ENV_DATA64)
    return FALSE != TR::Compiler->javaVM->isIndexableDataAddrPresent;
 #else
