@@ -108,6 +108,23 @@ MM_ConfigurationRealtime::createHeapWithManager(MM_EnvironmentBase *env, uintptr
 {
 	MM_GCExtensionsBase* extensions = env->getExtensions();
 
+#if defined(J9VM_ENV_DATA64) || defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+	PORT_ACCESS_FROM_ENVIRONMENT(env);
+
+#if defined(J9VM_ENV_DATA64)
+	if (extensions->isVirtualLargeObjectHeapRequested) {
+		j9tty_printf(PORTLIB, "WARNING: '-XX:enableVirtualLargeObjectHeap' is not supported on '-Xgcpolicy:metronome'. Running without option '-XX:enableVirtualLargeObjectHeap'.\n");
+	}
+#endif /* defined(J9VM_ENV_DATA64) */
+
+#if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
+	if (extensions->isArrayletDoubleMapRequested) {
+		j9tty_printf(PORTLIB, "WARNING: '-Xgc:enableArrayletDoubleMapping' is not supported on '-Xgcpolicy:metronome'. Running without option '-Xgc:enableArrayletDoubleMapping'.\n");
+	}
+#endif /* defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
+
+#endif /* defined(J9VM_ENV_DATA64) || defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
+
 	return MM_HeapVirtualMemory::newInstance(env, extensions->heapAlignment, heapBytesRequested, regionManager);
 }
 
