@@ -36,6 +36,7 @@
 #include "il/StaticSymbol.hpp"
 #include "il/StaticSymbol_inlines.hpp"
 #include "il/Symbol.hpp"
+#include "il/AutomaticSymbol.hpp"
 #include "il/SymbolReference.hpp"
 #include "env/VMAccessCriticalSection.hpp"
 #include "env/VMJ9.h"
@@ -103,7 +104,26 @@ J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *ar
    dataAddrField->setIsDataAddrPointer(true);
 
    dataAddrField->setIsInternalPointer(true);
-   dataAddrField->setPinningArrayPointer(arrayObject->getSymbolReference()->getSymbol()->castToAutoSymbol());
+   // dataAddrField->setPinningArrayPointer(arrayObject->getSymbolReference()->getSymbol()->castToAutoSymbol());
+
+   // copied from IdiomTransformations.cpp setPinningArray(TR::Compilation *comp, TR::Node *internalPtrStore, TR::Node *base, TR::Block *appendBlock)
+   TR::AutomaticSymbol *pinningArray = NULL;
+   if (arrayObject->getOpCode().isLoadVarDirect() &&
+       arrayObject->getSymbolReference()->getSymbol()->isAuto())
+      {
+      pinningArray = (arrayObject->getSymbolReference()->getSymbol()->castToAutoSymbol()->isInternalPointer()) ?
+             arrayObject->getSymbolReference()->getSymbol()->castToInternalPointerAutoSymbol()->getPinningArrayPointer() :
+             arrayObject->getSymbolReference()->getSymbol()->castToAutoSymbol();
+      }
+   else
+      {
+      TR::SymbolReference *newRef = comp->getSymRefTab()->createTemporary(comp->getMethodSymbol(), TR::Address);
+      TR::TreeTop::create(comp, TR::Node::createStore(newRef, createLoad(arrayObject)));
+      pinningArray = newRef->getSymbol()->castToAutoSymbol();
+      }
+   pinningArray->setPinningArrayPointer();
+   dataAddrField->getSymbolReference()->getSymbol()->castToInternalPointerAutoSymbol()->setPinningArrayPointer(pinningArray);
+   if (dataAddrField->isInternalPointer()) dataAddrField->setPinningArrayPointer(pinningArray);
 
    return dataAddrField;
    }
