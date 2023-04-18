@@ -910,7 +910,7 @@ int32_t TR_UnsafeFastPath::perform()
                if (isArrayOperation && fej9->isOffHeapAllocationEnabled())
                   {
                   TR::Node *baseNodeForAdd = TR::TransformUtil::generateDataAddrLoadTrees(comp(), base);
-                  TR::Node *newOffset = TR::Node::create(TR::ladd, 2, offset, TR::Node::lconst(-16));
+                  TR::Node *newOffset = TR::Node::create(TR::ladd, 2, offset, TR::Node::lconst(-TR::Compiler->om.contiguousArrayHeaderSizeInBytes()));
 
                   addrCalc = TR::Node::create(TR::aladd, 2, baseNodeForAdd, newOffset);
                   }
