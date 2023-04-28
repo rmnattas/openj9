@@ -985,6 +985,7 @@ J9::Z::TreeEvaluator::inlineVectorizedStringIndexOf(TR::Node* node, TR::CodeGene
    TR::Compilation *comp = cg->comp();
    const uint32_t elementSizeMask = isUTF16 ? 1 : 0;
    const int8_t vectorSize = cg->machine()->getVRFSize();
+   // TODO: Replace uses of headerSize with load of dataAddr field
    const uintptr_t headerSize = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
    const bool supportsVSTRS = comp->target().cpu.supportsFeature(OMR_FEATURE_S390_VECTOR_FACILITY_ENHANCEMENT_2);
    TR_Debug *compDebug = comp->getDebug();
@@ -1753,6 +1754,7 @@ J9::Z::TreeEvaluator::inlineIntrinsicIndexOf(TR::Node * node, TR::CodeGenerator 
    // VLL takes an index, not a count, so subtract 1 from the count
    generateRILInstruction(cg, TR::InstOpCode::SLFI, node, loadLength, 1);
 
+   // TODO: replace array with dataAddr load
    generateRXInstruction(cg, TR::InstOpCode::LA, node, offsetAddress, generateS390MemoryReference(array, indexRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg));
    generateVRSbInstruction(cg, TR::InstOpCode::VLL, node, charBufferVector, loadLength, generateS390MemoryReference(offsetAddress, 0, cg));
 
@@ -1781,6 +1783,7 @@ J9::Z::TreeEvaluator::inlineIntrinsicIndexOf(TR::Node * node, TR::CodeGenerator 
 
    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, loopLabel);
 
+   // TODO: replace array with dataAddr load
    generateVRXInstruction(cg, TR::InstOpCode::VL, node, charBufferVector, generateS390MemoryReference(array, indexRegister, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg));
 
    generateVRRbInstruction(cg, TR::InstOpCode::VFEE, node, resultVector, charBufferVector, valueVector, 0x1, elementSizeMask);
@@ -2665,6 +2668,7 @@ J9::Z::TreeEvaluator::inlineStringHashCode(TR::Node* node, TR::CodeGenerator* cg
    // Create the necessary registers
    TR::Register* registerHash = cg->allocateRegister();
 
+   // TODO: use registerValue to load dataAddr field value instead of adding array header size
    TR::Register* registerValue = cg->evaluate(nodeValue);
    TR::Register* registerIndex = cg->gprClobberEvaluate(nodeIndex);
    TR::Register* registerCount = cg->gprClobberEvaluate(nodeCount);
@@ -14074,6 +14078,7 @@ J9::Z::TreeEvaluator::inlineIntegerToCharsForLatin1Strings(TR::Node *node, TR::C
 
    bool inputIs64Bit = inputValueNode->getDataType() == TR::Int64;
 
+   // TODO: Should be able to create destinationArrayMemRef by loading dataAddr field.
    TR::MemoryReference *destinationArrayMemRef = generateS390MemoryReference(byteArrayReg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg);
 
    TR::LabelSymbol *cFlowRegionStart = generateLabelSymbol(cg);
@@ -14100,7 +14105,7 @@ J9::Z::TreeEvaluator::inlineIntegerToCharsForLatin1Strings(TR::Node *node, TR::C
    generateS390CompareAndBranchInstruction(cg, inputIs64Bit ? TR::InstOpCode::CG : TR::InstOpCode::C, node, inputValueReg, 0, TR::InstOpCode::COND_BNL, handleDigitsLabel, false);
    generateRILInstruction(cg, TR::InstOpCode::SLFI, node, stringSizeReg, 1);
    generateSIInstruction(cg, TR::InstOpCode::MVI, node, generateS390MemoryReference(*destinationArrayMemRef, 0, cg), 45);
-   generateRILInstruction(cg, TR::InstOpCode::getAddImmOpCode(), node, byteArrayReg, 1);
+   generateRILInstruction(cg, TR::InstOpCode::getAddImmOpCode(), node, byteArrayReg, 1); // TODO: why are we adding 1 here?
 
    generateS390LabelInstruction(cg, TR::InstOpCode::label, node, handleDigitsLabel);
    TR::Register *intToPDReg = cg->allocateRegister(TR_VRF);
@@ -14156,7 +14161,7 @@ J9::Z::TreeEvaluator::inlineIntegerToCharsForLatin1Strings(TR::Node *node, TR::C
       generateVRSdInstruction(cg, TR::InstOpCode::VSTRLR, node, stringSizeReg, zonedDecimalReg2, generateS390MemoryReference(*destinationArrayMemRef, 0, cg));
       // increment bytearrayreg by stringsizereg+1 to move buffer pointer forward so we can write remaining bytes.
       generateRILInstruction(cg, TR::InstOpCode::AFI, node, stringSizeReg, 1);
-      generateRRInstruction(cg, TR::InstOpCode::getAddRegWidenOpCode(), node, byteArrayReg, stringSizeReg);
+      generateRRInstruction(cg, TR::InstOpCode::getAddRegWidenOpCode(), node, byteArrayReg, stringSizeReg); // TODO: is array object pointer a must or can we use dataAddr pointer here?
       generateVSIInstruction(cg, TR::InstOpCode::VSTRL, node, zonedDecimalReg1, generateS390MemoryReference(*destinationArrayMemRef, 0, cg), 15);
 
       dependencies = generateRegisterDependencyConditions(0, 8, cg);
@@ -14415,6 +14420,7 @@ J9::Z::TreeEvaluator::inlineIntegerToCharsForUTF16Strings(TR::Node *node, TR::Co
 TR::Register*
 J9::Z::TreeEvaluator::inlineIntegerStringSize(TR::Node* node, TR::CodeGenerator* cg)
    {
+   // TODO: Need to verify what the nodes look like. if inputValueNode is load of an array then we might be able to enable evaluator for off heap.
    TR::Compilation *comp = cg->comp();
    static const bool disableIntegerStringSizeBranch = feGetEnv("TR_disableStringSizeBranch") != NULL;
    TR::Node *inputValueNode = node->getChild(0);
