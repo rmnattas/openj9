@@ -8024,7 +8024,6 @@ J9::X86::TreeEvaluator::VMnewEvaluator(
 #ifdef TR_TARGET_64BIT
    if (isArrayNew && TR::Compiler->om.isIndexableDataAddrPresent())
       {
-      printf("sverma: should we really be here!!!\n");
       /* Here we'll update dataAddr slot for both fixed and variable length arrays. Fixed length arrays are
        * simple as we just need to check first child of the node for array size. For variable length arrays,
        * runtime size checks are needed to determine whether to use contiguous or discontiguous header layout.
