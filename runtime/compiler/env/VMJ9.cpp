@@ -4091,15 +4091,18 @@ TR_J9VMBase::initializeLocalArrayHeader(TR::Compilation * comp, TR::Node * alloc
    prevTree = TR::TreeTop::create(comp, prevTree, node);
 
 #if defined(TR_TARGET_64BIT)
-   // -----------------------------------------------------------------------------------
-   // Initialize data address field
-   // -----------------------------------------------------------------------------------
-   TR::SymbolReference *dataAddrFieldOffsetSymRef = comp->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(comp->fej9()->getOffsetOfContiguousDataAddrField());
-   TR::Node *headerSizeNode = TR::Node::lconst(allocationNode, TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
-   TR::Node *startOfDataNode = TR::Node::create(TR::aladd, 2, allocationNode, headerSizeNode);
+   if (TR::Compiler->om.isIndexableDataAddrPresent())
+      {
+      // -----------------------------------------------------------------------------------
+      // Initialize data address field
+      // -----------------------------------------------------------------------------------
+      TR::SymbolReference *dataAddrFieldOffsetSymRef = comp->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(comp->fej9()->getOffsetOfContiguousDataAddrField());
+      TR::Node *headerSizeNode = TR::Node::lconst(allocationNode, TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+      TR::Node *startOfDataNode = TR::Node::create(TR::aladd, 2, allocationNode, headerSizeNode);
 
-   TR::Node *storeDataAddrPointerNode = TR::Node::createWithSymRef(TR::astorei, 2, allocationNode, startOfDataNode, 0, dataAddrFieldOffsetSymRef);
-   prevTree = TR::TreeTop::create(comp, prevTree, storeDataAddrPointerNode);
+      TR::Node *storeDataAddrPointerNode = TR::Node::createWithSymRef(TR::astorei, 2, allocationNode, startOfDataNode, 0, dataAddrFieldOffsetSymRef);
+      prevTree = TR::TreeTop::create(comp, prevTree, storeDataAddrPointerNode);
+      }
 #endif /* TR_TARGET_64BIT */
    }
 
