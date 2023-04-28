@@ -10536,6 +10536,7 @@ static TR::Register *inlineStringHashcode(TR::Node *node, TR::CodeGenerator *cg)
     TR::LabelSymbol *POSTVSXLabel = generateLabelSymbol(cg);
     TR::LabelSymbol *endLabel = generateLabelSymbol(cg);
 
+    // TODO: hdrSize can be replaced by dataAddr load
     // Skip header of the array
     // v = v + offset<<1
     // end = v + count<<1
@@ -11006,6 +11007,7 @@ static TR::Register *inlineIntrinsicIndexOf(TR::Node *node, TR::CodeGenerator *c
 
    // This evaluator function handles different indexOf() intrinsics, some of which are static calls without a
    // receiver. Hence, the need for static call check.
+   // TODO: replace use of array + header size with load of dataAddr field
    const bool isStaticCall = node->getSymbolReference()->getSymbol()->castToMethodSymbol()->isStatic();
    const uint8_t firstCallArgIdx = isStaticCall ? 0 : 1;
    TR::Register *array = cg->evaluate(node->getChild(firstCallArgIdx));
@@ -11765,9 +11767,13 @@ J9::Power::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&result
          return true;
 
       case TR::java_lang_String_hashCodeImplDecompressed:
-         if (!TR::Compiler->om.canGenerateArraylets() && comp->target().cpu.isAtLeast(OMR_PROCESSOR_PPC_P8) && comp->target().cpu.supportsFeature(OMR_FEATURE_PPC_HAS_VSX) && !comp->compileRelocatableCode()
+         if (!TR::Compiler->om.canGenerateArraylets()
+             && !TR::Compiler->om.isOffHeapAllocationEnabled()
+             && comp->target().cpu.isAtLeast(OMR_PROCESSOR_PPC_P8)
+             && comp->target().cpu.supportsFeature(OMR_FEATURE_PPC_HAS_VSX)
+             && !comp->compileRelocatableCode()
 #ifdef J9VM_OPT_JITSERVER
-               && !comp->isOutOfProcessCompilation()
+             && !comp->isOutOfProcessCompilation()
 #endif
             )
             {
