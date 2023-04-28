@@ -9355,6 +9355,7 @@ static TR::Register* inlineStringHashCode(TR::Node* node, bool isCompressed, TR:
 
    static uint64_t MASKDECOMPRESSED[] = { 0x0000000000000000ULL, 0xffffffffffffffffULL };
    static uint64_t MASKCOMPRESSED[]   = { 0xffffffff00000000ULL, 0x0000000000000000ULL };
+   // TODO: use dataAddr pointer as base address instead of array object address
    generateRegMemInstruction(isCompressed ? TR::InstOpCode::MOVDRegMem : TR::InstOpCode::MOVQRegMem, node, hashXMM, generateX86MemoryReference(address, index, shift, -(size << shift) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg), cg);
    generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, tmp, generateX86MemoryReference(cg->findOrCreate16ByteConstant(node, isCompressed ? MASKCOMPRESSED : MASKDECOMPRESSED), cg), cg);
 
@@ -9380,6 +9381,7 @@ static TR::Register* inlineStringHashCode(TR::Node* node, bool isCompressed, TR:
    generateRegMemInstruction(TR::InstOpCode::MOVDQURegMem, node, multiplierXMM, generateX86MemoryReference(cg->findOrCreate16ByteConstant(node, multiplier), cg), cg);
    generateLabelInstruction(TR::InstOpCode::label, node, loopLabel, cg);
    generateRegRegInstruction(TR::InstOpCode::PMULLDRegReg, node, hashXMM, multiplierXMM, cg);
+   // TODO: use dataAddr pointer as base address instead of array object address
    generateRegMemInstruction(isCompressed ? TR::InstOpCode::PMOVZXBDRegMem : TR::InstOpCode::PMOVZXWDRegMem, node, tmpXMM, generateX86MemoryReference(address, index, shift, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg), cg);
    generateRegImmInstruction(TR::InstOpCode::ADD4RegImms, node, index, 4, cg);
    generateRegRegInstruction(TR::InstOpCode::PADDDRegReg, node, hashXMM, tmpXMM, cg);
@@ -9539,6 +9541,7 @@ static TR::Register* inlineIntrinsicIndexOf(TR::Node* node, TR::CodeGenerator* c
    generateRegRegInstruction(TR::InstOpCode::MOV4RegReg, node, result, offset, cg);
 
    generateLabelInstruction(TR::InstOpCode::label, node, begLabel, cg);
+   // TODO: use of array header size can be replace by load of dataAddr field
    generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, scratch, generateX86MemoryReference(array, result, shift, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg), cg);
    generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, ECX, scratch, cg);
    generateRegImmInstruction(TR::InstOpCode::ANDRegImms(), node, scratch, ~(width - 1), cg);
@@ -9561,6 +9564,7 @@ static TR::Register* inlineIntrinsicIndexOf(TR::Node* node, TR::CodeGenerator* c
    generateLabelInstruction(TR::InstOpCode::JGE1, node, endLabel, cg);
 
    generateLabelInstruction(TR::InstOpCode::label, node, loopLabel, cg);
+   // TODO: use of array header size can be replace by load of dataAddr field
    generateRegMemInstruction(TR::InstOpCode::MOVDQURegMem, node, scratchXMM, generateX86MemoryReference(array, result, shift, TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), cg), cg);
    generateRegRegInstruction(compareOp, node, scratchXMM, valueXMM, cg);
    generateRegRegInstruction(TR::InstOpCode::PMOVMSKB4RegReg, node, scratch, scratchXMM, cg);
@@ -11801,6 +11805,7 @@ J9::X86::TreeEvaluator::inlineStringLatin1Inflate(TR::Node *node, TR::CodeGenera
    TR_ASSERT_FATAL(!TR::Compiler->om.canGenerateArraylets(), "StringLatin1.inflate intrinsic is not supported with arraylets");
    TR_ASSERT_FATAL_WITH_NODE(node, node->getNumChildren() == 5, "Wrong number of children in inlineStringLatin1Inflate");
 
+   // TODO: Should be able to use dataAddr field instead of array header size here
    intptr_t headerOffsetConst = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
    uint8_t vectorLengthConst = 16;
 
@@ -12329,6 +12334,7 @@ J9::X86::TreeEvaluator::stringCaseConversionHelper(TR::Node *node, TR::CodeGener
    TR::Instruction * cursor = NULL;
 
    uint32_t strideSize = 16;
+   // TODO: use of header size here can be replaced with dataAddr pointer load
    uintptr_t headerSize = TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
 
    static uint16_t MINUS1[] =
