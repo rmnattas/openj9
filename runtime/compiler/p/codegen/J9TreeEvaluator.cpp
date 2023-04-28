@@ -10536,6 +10536,7 @@ static TR::Register *inlineStringHashcode(TR::Node *node, TR::CodeGenerator *cg)
     TR::LabelSymbol *POSTVSXLabel = generateLabelSymbol(cg);
     TR::LabelSymbol *endLabel = generateLabelSymbol(cg);
 
+    // TODO: hdrSize can be replaced by dataAddr load
     // Skip header of the array
     // v = v + offset<<1
     // end = v + count<<1
@@ -10998,6 +10999,7 @@ static TR::Register *inlineIntrinsicIndexOf(TR::Node *node, TR::CodeGenerator *c
    auto vectorCompareOp = isLatin1 ? TR::InstOpCode::vcmpequb_r : TR::InstOpCode::vcmpequh_r;
    auto scalarLoadOp = isLatin1 ? TR::InstOpCode::lbzx : TR::InstOpCode::lhzx;
 
+   // TODO: replace use of array + header size with load of dataAddr field
    TR::Register *array = cg->evaluate(node->getChild(1));
    TR::Register *ch = cg->evaluate(node->getChild(2));
    TR::Register *offset = cg->evaluate(node->getChild(3));
@@ -11752,9 +11754,13 @@ J9::Power::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&result
          return true;
 
       case TR::java_lang_String_hashCodeImplDecompressed:
-         if (!TR::Compiler->om.canGenerateArraylets() && comp->target().cpu.isAtLeast(OMR_PROCESSOR_PPC_P8) && comp->target().cpu.supportsFeature(OMR_FEATURE_PPC_HAS_VSX) && !comp->compileRelocatableCode()
+         if (!TR::Compiler->om.canGenerateArraylets()
+             && !TR::Compiler->om.isOffHeapAllocationEnabled()
+             && comp->target().cpu.isAtLeast(OMR_PROCESSOR_PPC_P8)
+             && comp->target().cpu.supportsFeature(OMR_FEATURE_PPC_HAS_VSX)
+             && !comp->compileRelocatableCode()
 #ifdef J9VM_OPT_JITSERVER
-               && !comp->isOutOfProcessCompilation()
+             && !comp->isOutOfProcessCompilation()
 #endif
             )
             {
