@@ -36,6 +36,7 @@
 #include "il/StaticSymbol.hpp"
 #include "il/StaticSymbol_inlines.hpp"
 #include "il/Symbol.hpp"
+#include "il/AutomaticSymbol.hpp"
 #include "il/SymbolReference.hpp"
 #include "env/VMAccessCriticalSection.hpp"
 #include "env/VMJ9.h"
@@ -90,6 +91,32 @@ J9::TransformUtil::generateArrayElementShiftAmountTrees(
    }
 
 #if defined(TR_TARGET_64BIT)
+
+void
+J9::TransformUtil::setPinningArrayForOffHeapAccess(TR::Compilation *comp, TR::Node *arrayObject, TR::Node *dataAddrField, TR::Block *appendBlock)
+   {
+   // copied from IdiomTransformations.cpp setPinningArray(TR::Compilation *comp, TR::Node *internalPtrStore, TR::Node *base, TR::Block *appendBlock)
+   TR::AutomaticSymbol *pinningArray = NULL;
+   if (arrayObject->getOpCode().isLoadVarDirect() &&
+       arrayObject->getSymbolReference()->getSymbol()->isAuto())
+      {
+      pinningArray = (arrayObject->getSymbolReference()->getSymbol()->castToAutoSymbol()->isInternalPointer()) ?
+             arrayObject->getSymbolReference()->getSymbol()->castToInternalPointerAutoSymbol()->getPinningArrayPointer() :
+             arrayObject->getSymbolReference()->getSymbol()->castToAutoSymbol();
+      }
+   else
+      {
+      TR::SymbolReference *newRef = comp->getSymRefTab()->createTemporary(comp->getMethodSymbol(), TR::Address);
+      TR::Node *loadNode = arrayObject->getOpCode().isStoreDirect() ? TR::Node::createLoad(arrayObject, arrayObject->getSymbolReference()) :
+                                                  arrayObject->duplicateTree();
+      appendBlock->append(TR::TreeTop::create(comp, TR::Node::createStore(newRef, loadNode)));
+      pinningArray = newRef->getSymbol()->castToAutoSymbol();
+      }
+   pinningArray->setPinningArrayPointer();
+   dataAddrField->getSymbolReference()->getSymbol()->castToInternalPointerAutoSymbol()->setPinningArrayPointer(pinningArray);
+   if (dataAddrField->isInternalPointer()) dataAddrField->setPinningArrayPointer(pinningArray);
+   }
+
 // Generates IL trees to load dataAddr field from array header
 TR::Node *
 J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *arrayObject)
@@ -106,6 +133,10 @@ J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *ar
    TR::SymbolReference *dataAddrFieldOffset = comp->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(fej9->getOffsetOfContiguousDataAddrField());
    TR::Node *dataAddrField = TR::Node::createWithSymRef(TR::aloadi, 1, arrayObject, 0, dataAddrFieldOffset);
    dataAddrField->setIsDataAddrPointer(true);
+   dataAddrField->setIsInternalPointer(true);
+
+   // TODO: move call to the correct location
+   setPinningArrayForOffHeapAccess(comp, arrayObject, dataAddrField, comp->getCurrentBlock());
 
    return dataAddrField;
    }

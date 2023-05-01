@@ -107,6 +107,7 @@ public:
          TR::Node *object);
 
 #if defined(TR_TARGET_64BIT)
+   static void setPinningArrayForOffHeapAccess(TR::Compilation *comp, TR::Node *arrayObject, TR::Node *dataAddrField, TR::Block *appendBlock);
    static TR::Node *generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *arrayObject);
 #endif /* TR_TARGET_64BIT */
    static TR::Node *generateArrayAddressTrees(
