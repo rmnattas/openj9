@@ -2103,7 +2103,7 @@ TR_J9InlinerPolicy::isInlineableJNI(TR_ResolvedMethod *method,TR::Node *callNode
       // In Java9 sun/misc/Unsafe methods are simple Java wrappers to JNI
       // methods in jdk.internal, and the enum values above match both. Only
       // return true for the methods that are native.
-      if (!TR::Compiler->om.canGenerateArraylets() || (callNode && callNode->isUnsafeGetPutCASCallOnNonArray()))
+      if ((!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled()) || (callNode && callNode->isUnsafeGetPutCASCallOnNonArray()))
          return method->isNative();
       else
          return false;

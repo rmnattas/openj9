@@ -9613,8 +9613,10 @@ static TR::Register* inlineIntrinsicIndexOf(TR::Node* node, TR::CodeGenerator* c
 static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGenerator* cg)
    {
    TR::Compilation *comp = cg->comp();
+   TR_J9VMBase *fej9 = comp->fej9();
 
-   TR_ASSERT(!TR::Compiler->om.canGenerateArraylets() || node->isUnsafeGetPutCASCallOnNonArray(), "This evaluator does not support arraylets.");
+   // TODO: create codegen api like arrayCopy?
+   TR_ASSERT_FATAL((!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled()) || node->isUnsafeGetPutCASCallOnNonArray(), "This evaluator does not support arraylets and off heap.");
 
    cg->recursivelyDecReferenceCount(node->getChild(0)); // The Unsafe
    TR::Node* objectNode   = node->getChild(1);
@@ -9622,15 +9624,23 @@ static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGe
    TR::Node* oldValueNode = node->getChild(3);
    TR::Node* newValueNode = node->getChild(4);
 
-   TR::Register* object   = cg->evaluate(objectNode);
-   TR::Register* offset   = cg->evaluate(offsetNode);
-   TR::Register* oldValue = cg->evaluate(oldValueNode);
-   TR::Register* newValue = cg->evaluate(newValueNode);
-   TR::Register* result   = cg->allocateRegister();
-   TR::Register* EAX      = cg->allocateRegister();
-   TR::Register* tmp      = cg->allocateRegister();
+   TR::Register* object           = cg->evaluate(objectNode);
+   // evaluation of offset is determined by if we are dealing with an array operation or not
+   TR::Register* offset           = NULL;
+   TR::Register* oldValue         = cg->evaluate(oldValueNode);
+   TR::Register* newValue         = cg->evaluate(newValueNode);
+   TR::Register* result           = cg->allocateRegister();
+   TR::Register* EAX              = cg->allocateRegister();
+   TR::Register* tmp              = cg->allocateRegister();
+   TR::Register* firstDataElement = NULL;
 
    bool use64BitClasses = comp->target().is64Bit() && !comp->useCompressedPointers();
+
+   TR::MemoryReference *objectFieldMR = NULL;
+      {
+      offset = cg->evaluate(offsetNode);
+      objectFieldMR = generateX86MemoryReference(object, offset, 0, cg);
+      }
 
    if (comp->target().is32Bit())
       {
@@ -9761,7 +9771,7 @@ inlineCompareAndSwapNative(
 
    TR::InstOpCode::Mnemonic op;
 
-   if (TR::Compiler->om.canGenerateArraylets() && !node->isUnsafeGetPutCASCallOnNonArray())
+   if ((TR::Compiler->om.canGenerateArraylets() || TR::Compiler->om.isOffHeapAllocationEnabled()) && !node->isUnsafeGetPutCASCallOnNonArray())
       return false;
 
    static char *disableCASInlining = feGetEnv("TR_DisableCASInlining");
@@ -9827,6 +9837,18 @@ inlineCompareAndSwapNative(
    cg->decReferenceCount(offsetChild);
 
    TR::MemoryReference *mr;
+
+   /* TODO: Check if off heap is enabled
+    * If Off heap is enabled:
+    *    check if object is of type array
+    *      For reference: VMHelpers::objectIsArray(J9VMThread *currentThread, j9object_t object)
+    *      For reference: aarch64/J9TreeEvaluator::genInstanceOfOrCheckCastObjectArrayTest(...)
+    *    Array object:
+    *       load dataAddr field into a reg
+    *       subtract arrayheader size from offsetReg
+    *    else:
+    *       leave everything as it is
+    */
 
    if (offsetReg)
       mr = generateX86MemoryReference(objectReg, offsetReg, 0, cg);
@@ -10119,6 +10141,7 @@ bool J9::X86::TreeEvaluator::VMinlineCallEvaluator(
             break;
          case TR::sun_misc_Unsafe_compareAndSwapObject_jlObjectJjlObjectjlObject_Z:
             {
+            // TODO_sverma: where do we guard against arraylets because we defintely don't do it here or in the evaluators
             static bool UseOldCompareAndSwapObject = (bool)feGetEnv("TR_UseOldCompareAndSwapObject");
             if(node->isSafeForCGToFastPathUnsafeCall())
                {
