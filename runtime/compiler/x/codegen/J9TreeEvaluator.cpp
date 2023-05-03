@@ -9614,9 +9614,10 @@ static TR::Register* inlineIntrinsicIndexOf(TR::Node* node, TR::CodeGenerator* c
 static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGenerator* cg)
    {
    TR::Compilation *comp = cg->comp();
-   TR_J9VMBase *fej9 = (TR_J9VMBase *)(comp->fe());
+   TR_J9VMBase *fej9 = comp->fej9();
 
-   TR_ASSERT(!TR::Compiler->om.canGenerateArraylets() || node->isUnsafeGetPutCASCallOnNonArray(), "This evaluator does not support arraylets.");
+   // TODO: create codegen api like arrayCopy?
+   TR_ASSERT_FATAL((!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled()) || node->isUnsafeGetPutCASCallOnNonArray(), "This evaluator does not support arraylets and off heap.");
 
    cg->recursivelyDecReferenceCount(node->getChild(0)); // The Unsafe
    TR::Node* objectNode   = node->getChild(1);
@@ -9634,60 +9635,10 @@ static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGe
    TR::Register* tmp              = cg->allocateRegister();
    TR::Register* firstDataElement = NULL;
 
-   TR::ResolvedMethodSymbol *methodSymbol = comp->getMethodSymbol();
-   bool isArrayOperation = false;
-   // Check for array operation
-   switch (methodSymbol->getRecognizedMethod())
-      {
-      case TR::java_util_concurrent_ConcurrentHashMap_casTabAt:
-         isArrayOperation = true;
-      default:
-         break;
-      }
-
+   // TODO: see notes in inlineCompareAndSwapNative for teaching the evaluator about dataAddr field
    bool use64BitClasses = comp->target().is64Bit() && !comp->useCompressedPointers();
 
    TR::MemoryReference *objectFieldMR = NULL;
-#if defined(TR_TARGET_64BIT)
-   if (isArrayOperation && fej9->isOffHeapAllocationEnabled())
-      {
-      TR::Node *lshl = offsetNode->getFirstChild();
-      TR::Node *i2l = lshl->getFirstChild();
-      TR::Node *iRegLoad = i2l->getFirstChild();
-
-      if (offsetNode->getReferenceCount() == 1
-         && lshl->getReferenceCount() == 1
-         && i2l->getReferenceCount() == 1
-         && iRegLoad->getReferenceCount() == 1
-         && lshl->getSecondChild()->getReferenceCount() == 1
-         && offsetNode->getSecondChild()->getReferenceCount() == 1)
-         {
-         /* Since it is an array operation we are probably deaing with
-          * n1 ladd
-          * n2   lshl
-          * n3     i2l
-          * n4        ==>iRegLoad ; actual offset
-          * n5     iload  java/util/concurrent/ConcurrentHashMap.ASHIFT I
-          * n6   lload  java/util/concurrent/ConcurrentHashMap.ABASE J
-          *
-          * we can get away by evaluating just n2
-          */
-         offset = cg->evaluate(lshl);
-         firstDataElement = cg->allocateRegister();
-
-         TR::MemoryReference *dataAddrSlotMR = generateX86MemoryReference(object, fej9->getOffsetOfContiguousDataAddrField(), cg);
-         // load dataAddr field into a reg
-         generateRegMemInstruction(TR::InstOpCode::LRegMem(), node, firstDataElement, dataAddrSlotMR, cg);
-         // create memory refernce the normal way using dataAddr pointer as base
-         objectFieldMR = generateX86MemoryReference(firstDataElement, offset, 0, cg);
-
-         // Decrement refernce counts, this would have been done during
-         // evaluation of offsetNode.
-         cg->recursivelyDecReferenceCount(offsetNode->getSecondChild());
-         }
-      }
-   else
-#endif /* TR_TARGET_64BIT */
       {
       offset = cg->evaluate(offsetNode);
       objectFieldMR = generateX86MemoryReference(object, offset, 0, cg);
@@ -9812,7 +9763,7 @@ inlineCompareAndSwapNative(
 
    TR::InstOpCode::Mnemonic op;
 
-   if (TR::Compiler->om.canGenerateArraylets() && !node->isUnsafeGetPutCASCallOnNonArray())
+   if ((TR::Compiler->om.canGenerateArraylets() || TR::Compiler->om.isOffHeapAllocationEnabled()) && !node->isUnsafeGetPutCASCallOnNonArray())
       return false;
 
    static char *disableCASInlining = feGetEnv("TR_DisableCASInlining");
@@ -9878,6 +9829,18 @@ inlineCompareAndSwapNative(
    cg->decReferenceCount(offsetChild);
 
    TR::MemoryReference *mr;
+
+   /* TODO: Check if off heap is enabled
+    * If Off heap is enabled:
+    *    check if object is of type array
+    *      For reference: VMHelpers::objectIsArray(J9VMThread *currentThread, j9object_t object)
+    *      For reference: aarch64/J9TreeEvaluator::genInstanceOfOrCheckCastObjectArrayTest(...)
+    *    Array object:
+    *       load dataAddr field into a reg
+    *       subtract arrayheader size from offsetReg
+    *    else:
+    *       leave everything as it is
+    */
 
    if (offsetReg)
       mr = generateX86MemoryReference(objectReg, offsetReg, 0, cg);
@@ -10170,6 +10133,7 @@ bool J9::X86::TreeEvaluator::VMinlineCallEvaluator(
             break;
          case TR::sun_misc_Unsafe_compareAndSwapObject_jlObjectJjlObjectjlObject_Z:
             {
+            // TODO_sverma: where do we guard against arraylets because we defintely don't do it here or in the evaluators
             static bool UseOldCompareAndSwapObject = (bool)feGetEnv("TR_UseOldCompareAndSwapObject");
             if(node->isSafeForCGToFastPathUnsafeCall())
                {
