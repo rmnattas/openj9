@@ -3690,8 +3690,9 @@ J9::Z::CodeGenerator::suppressInliningOfRecognizedMethod(TR::RecognizedMethod me
       }
 
    static bool disableCRC32CAcceleration = (feGetEnv("TR_DisableCRC32CAcceleration") != NULL);
-   if (!disableCRC32CAcceleration && self()->getSupportsVectorRegisters())
+   if (!disableCRC32CAcceleration && self()->getSupportsVectorRegisters() && !TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled())
       {
+      // TODO_sverma: shouldn't we be checking for arraylets here?
       if (method == TR::java_util_zip_CRC32C_updateBytes ||
          method == TR::java_util_zip_CRC32C_updateDirectByteBuffer)
          {
