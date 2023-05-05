@@ -343,17 +343,17 @@ J9::Node::processJNICall(TR::TreeTop *callNodeTreeTop, TR::ResolvedMethodSymbol 
    static const bool disableCRC32 = feGetEnv("TR_aarch64DisableCRC32") != NULL;
    // Recognizing these methods on AArch46 allows us to accelerate CRC32 calculation
    // by inlining these methods using CRC32 instructions.
-   if (comp->target().cpu.supportsFeature(OMR_FEATURE_ARM64_CRC32) && (!disableCRC32) &&
-        ((methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_update) ||
+   if (comp->target().cpu.supportsFeature(OMR_FEATURE_ARM64_CRC32) && !disableCRC32 &&
+        (methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_update ||
          (
 #if JAVA_SPEC_VERSION <= 8
-          ((methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateBytes) ||
-           (methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateByteBuffer)) &&
+          (methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateBytes ||
+           methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateByteBuffer) &&
 #else
-          ((methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateBytes0) ||
-           (methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateByteBuffer0)) &&
+          (methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateBytes0 ||
+           methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateByteBuffer0) &&
 #endif
-          (!TR::Compiler->om.canGenerateArraylets()))))
+          !TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled())))
       {
       return self();
       }
@@ -365,15 +365,16 @@ J9::Node::processJNICall(TR::TreeTop *callNodeTreeTop, TR::ResolvedMethodSymbol 
    // optimized helpers in the JIT library using what amounts to system/C dispatch.
    // The addresses of the optimized helpers in the server process will not necessarily
    // match the client-side addresses, so we can't take this shortcut in JITServer mode.
-   if (((methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_update) ||
+   if ((methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_update ||
 #if JAVA_SPEC_VERSION <= 8
-        (methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateBytes) ||
-        (methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateByteBuffer)) &&
+        methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateBytes ||
+        methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateByteBuffer) &&
 #else
-        (methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateBytes0) ||
-        (methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateByteBuffer0)) &&
+        methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateBytes0 ||
+        methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateByteBuffer0) &&
 #endif
-       !comp->requiresSpineChecks()
+       !comp->requiresSpineChecks() &&
+       !TR::Compiler->om.isOffHeapAllocationEnabled()
       #ifdef J9VM_OPT_JITSERVER
          && !comp->isOutOfProcessCompilation()
       #endif
