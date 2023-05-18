@@ -67,9 +67,10 @@ J9::Node::Node(TR::Node *originatingByteCodeNode, TR::ILOpCodes op, uint16_t num
        + self()->hasBlock()
        + self()->hasArrayStride()
        + self()->hasPinningArrayPointer()
+       + (self()->getOpCodeValue() == TR::aloadi)
        + self()->hasDataType() <= 1,
          "_unionPropertyA union is not disjoint for this node %s (%p):\n"
-         "  has({SymbolReference, ...}, ..., DataType) = ({%1d,%1d},%1d,%1d,%1d,%1d,%1d)\n",
+         "  has({SymbolReference, ...}, ..., DataType) = ({%1d,%1d},%1d,%1d,%1d,%1d,%1d,%1d)\n",
          self()->getOpCode().getName(), this,
          self()->hasSymbolReference(),
          self()->hasRegLoadStoreSymbolReference(),
@@ -77,6 +78,7 @@ J9::Node::Node(TR::Node *originatingByteCodeNode, TR::ILOpCodes op, uint16_t num
          self()->hasBlock(),
          self()->hasArrayStride(),
          self()->hasPinningArrayPointer(),
+         (self()->getOpCodeValue() == TR::aloadi),
          self()->hasDataType());
 
    // check that _unionPropertyB union is disjoint
