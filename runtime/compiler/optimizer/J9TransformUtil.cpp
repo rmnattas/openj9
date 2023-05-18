@@ -107,6 +107,15 @@ J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *ar
    TR::Node *dataAddrField = TR::Node::createWithSymRef(TR::aloadi, 1, arrayObject, 0, dataAddrFieldOffset);
    dataAddrField->setIsDataAddrPointer(true);
 
+   // When array access is with an offset the aladd will be set as internal-pointer but not
+   // the aloadi, this ensures that the aloadi is marked as internal-pointer.
+   // 
+   // aladd
+   //   aloadi (dataAddrPointer)
+   //     aload (arrayRef)
+   //   <offset>
+   dataAddrField->setIsInternalPointer(true);
+
    return dataAddrField;
    }
 #endif /* TR_TARGET_64BIT */
