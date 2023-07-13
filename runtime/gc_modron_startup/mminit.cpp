@@ -2873,7 +2873,7 @@ gcInitializeDefaults(J9JavaVM* vm)
 	vm->omrVM->_gcOmrVMExtensions = (void *)extensions;
 	vm->gcExtensions = vm->omrVM->_gcOmrVMExtensions;
 #if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
-	vm->isIndexableDualHeaderShapeEnabled = FALSE;
+	vm->isIndexableDualHeaderShapeEnabled = TRUE;
 	vm->isIndexableDataAddrPresent = FALSE;
 #endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 
