@@ -1222,7 +1222,7 @@ TR_J9InlinerPolicy::createUnsafePutWithOffset(TR::ResolvedMethodSymbol *calleeSy
       }
 
    TR::TreeTop* arrayDirectAccessTreeTop;
-   
+
    if (conversionNeeded)
       arrayDirectAccessTreeTop = genDirectAccessCodeForUnsafeGetPut(unsafeNodeWithConversion, conversionNeeded, false);
    else if (TR::Compiler->om.isOffHeapAllocationEnabled() && comp()->target().is64Bit())
@@ -1286,6 +1286,7 @@ TR_J9InlinerPolicy::createUnsafePutWithOffset(TR::ResolvedMethodSymbol *calleeSy
       TR::Node *objBaseAddrNode = addrToAccessNode->getChild(0);
       TR::Node *dataAddrNode = TR::TransformUtil::generateDataAddrLoadTrees(comp(), objBaseAddrNode);
       addrToAccessNode->setChild(0, dataAddrNode);
+      objBaseAddrNode->decReferenceCount(); //correct refcount
 
       //subtract header size from offset
       TR::Node *oldOffset = addrToAccessNode->getChild(1);
@@ -1432,10 +1433,88 @@ TR_J9InlinerPolicy::createUnsafeCASCallDiamond( TR::TreeTop *callNodeTreeTop, TR
 
    TR::TreeTop *compareTree = genClassCheckForUnsafeGetPut(offsetNode);
 
+   TR::TreeTop *isArrayTreeTop = NULL;
+   TR::TreeTop *arrayAccessTreeTop = NULL;
+   TR::TreeTop *nonArrayAccessTreeTop = NULL;
+
+#if defined (J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+   if (TR::Compiler->om.isOffHeapAllocationEnabled())
+   {
+      //create arrayCHK treetop
+
+      // ificmpeq                               -> isArrayNode
+      //   iand                                 -> andNode
+      //     l2i                                -> isArrayField
+      //       lloadi  <isClassAndDepthFlags>
+      //         aloadi  <vft-symbol>           -> vftLoad Node
+      //           aload
+      //     iconst                             -> andConstNode
+      //   ==>iconst                            -> andConstNode
+
+      TR::Node * unsafeAddress = createUnsafeAddressWithOffset(callNode);
+      TR::SymbolReference *newSymbolReferenceForAddress = callNode->getChild(1)->getSymbolReference();
+
+      TR::Node *vftLoad = TR::Node::createWithSymRef(TR::aloadi, 1, 1, TR::Node::createWithSymRef(unsafeAddress, comp()->il.opCodeForDirectLoad(unsafeAddress->getDataType()), 0, newSymbolReferenceForAddress), comp()->getSymRefTab()->findOrCreateVftSymbolRef());
+
+      TR::Node *isArrayField = TR::Node::createWithSymRef(TR::lloadi, 1, 1, vftLoad, comp()->getSymRefTab()->findOrCreateClassAndDepthFlagsSymbolRef());
+      isArrayField = TR::Node::create(TR::l2i, 1, isArrayField);
+
+      TR::Node *andConstNode = TR::Node::create(isArrayField, TR::iconst, 0, TR::Compiler->cls.flagValueForArrayCheck(comp()));
+      TR::Node *andNode = TR::Node::create(TR::iand, 2, isArrayField, andConstNode);
+      TR::Node *isArrayNode = TR::Node::createif(TR::ificmpne, andNode, TR::Node::create(TR::iconst, 0), NULL);
+
+      isArrayTreeTop = TR::TreeTop::create(comp(), isArrayNode, NULL, NULL);
+
+
+      //create array access treetop
+      //adjust arguments if object is array and offheap is being used:
+      //    -change object base address (second child) to dataAddr
+      //    -subtract header size from offset (third child)
+
+      // NULLCHK on object base address               -> arrayDirectAddressTreeTop->getNode()
+      //   icall  sun/misc/Unsafe.compareAndSwap      -> Unsafe.compareAndSwap call
+      //     aload                                    -> Unsafe instance
+      //     aload                                    -> object base address
+      //     lload                                    -> offset
+      //     lload                                    -> value to compare against
+      //     lload                                    -> value to swap in
+
+      arrayAccessTreeTop = TR::TreeTop::create(comp(),callNodeTreeTop->getNode()->duplicateTree());
+      TR::Node *CASicallNode = arrayAccessTreeTop->getNode()->getChild(0);
+
+      //change object base address to dataAddr
+      TR::Node *objBaseAddrNode = CASicallNode->getChild(1);
+      TR::Node *dataAddrNode = TR::TransformUtil::generateDataAddrLoadTrees(comp(), objBaseAddrNode);
+      CASicallNode->setChild(1, dataAddrNode);
+      objBaseAddrNode->decReferenceCount(); //correct refcount
+
+      //subtract header size from offset
+      TR::Node *oldOffset = CASicallNode->getChild(2);
+      TR::Node *adjustedOffset;
+
+      if (oldOffset->getOpCode().isLoadConst())
+      {
+         int64_t adjustedOffsetConst = oldOffset->getConstValue() - TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
+         adjustedOffset = TR::Node::create(TR::lconst, adjustedOffsetConst);
+      }
+      else
+      {
+         TR::Node *adjustedOffset = TR::Node::create(TR::ladd, 2, oldOffset, TR::Node::lconst(-TR::Compiler->om.contiguousArrayHeaderSizeInBytes()));
+      }
+
+      CASicallNode->setChild(2, adjustedOffset);
+      oldOffset->decReferenceCount();
+
+      //if array check is being generated, need to create non-array access treetop (same as default)
+      if (arrayCheckNeeded)
+         nonArrayAccessTreeTop = TR::TreeTop::create(comp(),callNodeTreeTop->getNode()->duplicateTree());
+   }
+#endif /* TR_TARGET_64BIT */
+
+
    // genClassCheck generates a ifcmpne offset&mask 1, meaning if it IS lowtagged (ie offset&mask == 1), the branch will be taken
    TR::TreeTop *ifTree = TR::TreeTop::create(comp(),callNodeTreeTop->getNode()->duplicateTree());
    ifTree->getNode()->getFirstChild()->setIsSafeForCGToFastPathUnsafeCall(true);
-
 
    TR::TreeTop *elseTree = TR::TreeTop::create(comp(),callNodeTreeTop->getNode()->duplicateTree());
 
@@ -1443,9 +1522,7 @@ TR_J9InlinerPolicy::createUnsafeCASCallDiamond( TR::TreeTop *callNodeTreeTop, TR
    ifTree->getNode()->getFirstChild()->setVisitCount(_inliner->getVisitCount());
    elseTree->getNode()->getFirstChild()->setVisitCount(_inliner->getVisitCount());
 
-
    debugTrace(tracer(),"ifTree = %p elseTree = %p",ifTree->getNode(),elseTree->getNode());
-
 
 
    // the call itself may be commoned, so we need to create a temp for the callnode itself
@@ -1462,11 +1539,15 @@ TR_J9InlinerPolicy::createUnsafeCASCallDiamond( TR::TreeTop *callNodeTreeTop, TR
       }
 
 
-
-
    TR::Block *callBlock = callNodeTreeTop->getEnclosingBlock();
 
-   callBlock->createConditionalBlocksBeforeTree(callNodeTreeTop,compareTree, ifTree, elseTree, comp()->getFlowGraph(),false,false);
+   if (isArrayTreeTop != NULL) //offheap case: array check generated
+   {
+      callBlock->createConditionalBlocksBeforeTree(callNodeTreeTop, isArrayTreeTop, arrayAccessTreeTop, nonArrayAccessTreeTop, comp()->getFlowGraph(), false, false);
+      nonArrayAccessTreeTop->getEnclosingBlock()->createConditionalBlocksBeforeTree(nonArrayAccessTreeTop, compareTree, ifTree, elseTree, comp()->getFlowGraph(), false, false);
+   }
+   else //default case (gencon): no array check generated
+      callBlock->createConditionalBlocksBeforeTree(callNodeTreeTop, compareTree, ifTree, elseTree, comp()->getFlowGraph(), false, false);
 
    // the original call will be deleted by createConditionalBlocksBeforeTree, but if the refcount was > 1, we need to insert stores.
 
@@ -1477,15 +1558,24 @@ TR_J9InlinerPolicy::createUnsafeCASCallDiamond( TR::TreeTop *callNodeTreeTop, TR
 
       ifTree->insertAfter(ifStoreTree);
 
-      debugTrace(tracer(),"Inserted store tree %p for if side of the diamond",ifStoreNode);
+      debugTrace(tracer(),"Inserted store tree %p for if side of the diamond", ifStoreNode);
 
       TR::Node *elseStoreNode = TR::Node::createWithSymRef(comp()->il.opCodeForDirectStore(dataType), 1, 1, elseTree->getNode()->getFirstChild(), newSymbolReference);
       TR::TreeTop *elseStoreTree = TR::TreeTop::create(comp(), elseStoreNode);
 
       elseTree->insertAfter(elseStoreTree);
 
-      debugTrace(tracer(),"Inserted store tree %p for else side of the diamond",elseStoreNode);
+      debugTrace(tracer(),"Inserted store tree %p for else side of the diamond", elseStoreNode);
 
+      if (arrayAccessTreeTop != NULL)
+         {
+         TR::Node *arrayAccessStoreNode = TR::Node::createWithSymRef(comp()->il.opCodeForDirectStore(dataType), 1, 1, arrayAccessTreeTop->getNode()->getFirstChild(), newSymbolReference);
+         TR::TreeTop *arrayAccessStoreTree = TR::TreeTop::create(comp(), arrayAccessStoreNode);
+
+         arrayAccessTreeTop->insertAfter(arrayAccessStoreTree);
+
+         debugTrace(tracer(),"Inserted store tree %p for array access block", arrayAccessStoreNode);
+         }
       }
 
 
@@ -1650,6 +1740,7 @@ TR_J9InlinerPolicy::createUnsafeGetWithOffset(TR::ResolvedMethodSymbol *calleeSy
       TR::Node *objBaseAddrNode = addrToAccessNode->getChild(0);
       TR::Node *dataAddrNode = TR::TransformUtil::generateDataAddrLoadTrees(comp(), objBaseAddrNode);
       addrToAccessNode->setChild(0, dataAddrNode);
+      objBaseAddrNode->decReferenceCount(); //correct refcount
 
       //subtract header size from offset
       TR::Node *oldOffset = addrToAccessNode->getChild(1);
