@@ -1271,14 +1271,14 @@ TR_VectorAPIExpansion::generateAddressNode(TR::Compilation *comp, TR::Node *arra
 
    TR::Node *aladdNode = TR::Node::create(TR::aladd, 2);
    TR::Node *baseAddressNode = array;
-#if defined(TR_TARGET_64BIT)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
    if (TR::Compiler->om.isOffHeapAllocationEnabled())
       {
       baseAddressNode = TR::TransformUtil::generateDataAddrLoadTrees(comp, array);
       aladdNode->setIsInternalPointer(true);
       }
    else
-#endif /* TR_TARGET_64BIT */
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
       {
       laddNode->setAndIncChild(1, TR::Node::create(TR::lconst, 0, TR::Compiler->om.contiguousArrayHeaderSizeInBytes()));
       }

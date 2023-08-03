@@ -2064,7 +2064,7 @@ TR_J9ByteCodeIlGenerator::calculateElementAddressInContiguousArray(int32_t width
       }
    }
 
-#if defined(TR_TARGET_64BIT)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 void
 TR_J9ByteCodeIlGenerator::calculateElementAddressInContiguousArray(int32_t width)
    {
@@ -2098,7 +2098,7 @@ TR_J9ByteCodeIlGenerator::calculateElementAddressInContiguousArray(int32_t width
    // stack is now ...,firstArrayElement,shift/index<===
    genBinary(TR::aladd);
    }
-#endif /* TR_TARGET_64BIT */
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
 
 // Helper to calculate the index of the array element in a contiguous array
 // Stack: ..., offset for array element index
@@ -2185,7 +2185,7 @@ TR_J9ByteCodeIlGenerator::calculateArrayElementAddress(TR::DataType dataType, bo
    static bool enableDataAddrFieldLoad = (feGetEnv("sverma_EnableDataAddrFieldLoad") != NULL);
    static bool enablePrints = (feGetEnv("sverma_EnablePrints") != NULL);
    // Stack is now ...,aryRef,index<===
-#if defined(TR_TARGET_64BIT)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
    if (fej9()->isOffHeapAllocationEnabled()
       || enableDataAddrFieldLoad)
       {
@@ -2201,7 +2201,7 @@ TR_J9ByteCodeIlGenerator::calculateArrayElementAddress(TR::DataType dataType, bo
    else if (comp()->generateArraylets())
 #else
    if (comp()->generateArraylets())
-#endif /* TR_TARGET_64BIT */
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
       {
       if (enablePrints)
          printf("Arraylets are enabled.\n");

@@ -903,7 +903,7 @@ int32_t TR_UnsafeFastPath::perform()
                // TODO: call J9::TransformUtil::calculateElementAddress
                // TODO: Should we be setting addrCalc as internal pointer?
                // Calculate element address
-#if defined(TR_TARGET_64BIT)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
                if (isArrayOperation && TR::Compiler->om.isOffHeapAllocationEnabled())
                   {
                   TR::Node *baseNodeForAdd = TR::TransformUtil::generateDataAddrLoadTrees(comp(), base);
@@ -914,7 +914,7 @@ int32_t TR_UnsafeFastPath::perform()
                else if (comp()->target().is64Bit())
 #else
                if (comp()->target().is64Bit())
-#endif /* TR_TARGET_64BIT */
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
                   addrCalc = TR::Node::create(TR::aladd, 2, base, offset);
                else
                   addrCalc = TR::Node::create(TR::aiadd, 2, base, TR::Node::create(TR::l2i, 1, offset));

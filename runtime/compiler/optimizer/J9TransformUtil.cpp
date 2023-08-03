@@ -89,7 +89,7 @@ J9::TransformUtil::generateArrayElementShiftAmountTrees(
    return shiftAmount;
    }
 
-#if defined(TR_TARGET_64BIT)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 // Generates IL trees to load dataAddr field from array header
 TR::Node *
 J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *arrayObject)
@@ -108,7 +108,7 @@ J9::TransformUtil::generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *ar
 
    return dataAddrField;
    }
-#endif /* TR_TARGET_64BIT */
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
 
 // Generates IL trees for array access. It accepts offset in bytes and array base node
 TR::Node *
@@ -123,7 +123,7 @@ J9::TransformUtil::generateArrayAddressTrees(TR::Compilation *comp, TR::Node *ar
 
    // TODO_sverma: Add support for subtracting or adding offsetNode and header size
    //    Reference: https://github.com/eclipse-openj9/openj9/blob/master/runtime/compiler/optimizer/IdiomRecognitionUtils.cpp#L916
-#if defined(TR_TARGET_64BIT)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
    if (TR::Compiler->om.isOffHeapAllocationEnabled())
       {
       arrayAddressNode = generateDataAddrLoadTrees(comp, arrayNode);
@@ -133,7 +133,7 @@ J9::TransformUtil::generateArrayAddressTrees(TR::Compilation *comp, TR::Node *ar
    else if (comp->target().is64Bit())
 #else
    if (comp->target().is64Bit())
-#endif /* TR_TARGET_64BIT */
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
       {
       totalOffsetNode = TR::Node::lconst(TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
       if (offsetNode)
