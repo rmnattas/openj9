@@ -121,6 +121,7 @@ J9::X86::CodeGenerator::initialize()
       cg->setSupportsInlineStringHashCode();
       }
 
+   // TODO: Not sure if/how this will work for off heap arrays
    if (comp->generateArraylets() && !comp->getOptions()->realTimeGC())
       {
       cg->setSupportsStackAllocationOfArraylets();
