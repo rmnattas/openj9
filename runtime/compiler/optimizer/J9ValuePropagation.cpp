@@ -3138,11 +3138,11 @@ J9::ValuePropagation::doDelayedTransformations()
 
       if (isLoad)
          {
-         if (isFlattenedElement)
+         if (isFlattenedElement) // TODO_sverma: verify that this still works
             {
             transformFlattenedArrayElementLoad(arrayOpCallToTransform->_arrayClass, callNode);
             }
-         else if (isFlattenedElementUseTypeHint)
+         else if (isFlattenedElementUseTypeHint) // TODO_sverma: verify that this still works
             {
             transformFlattenedArrayElementLoadStoreUseTypeHint(arrayOpCallToTransform->_arrayClass, callNode, callTree, true /*isLoad*/, false);
             isCallTreeRemoved = true;
