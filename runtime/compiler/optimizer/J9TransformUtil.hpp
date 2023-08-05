@@ -106,7 +106,27 @@ public:
          TR::Compilation *comp,
          TR::Node *object);
 
-   static bool transformDirectLoad(TR::Compilation *, TR::Node *node);
+#if defined(TR_TARGET_64BIT)
+   static TR::Node *generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *arrayObject);
+#endif /* TR_TARGET_64BIT */
+   static TR::Node *generateArrayAddressTrees(
+      TR::Compilation *comp,
+      TR::Node *arrayNode,
+      TR::Node *offsetNode = NULL);
+
+   static TR::Node *generateArrayStartTrees(TR::Compilation *comp, TR::Node *arrayObject);
+
+   static TR::Node *generateArrayOffsetTrees(
+      TR::Compilation *comp,
+      TR::Node *indexNode,
+      TR::Node *strideNode = NULL,
+      int32_t elementSize = 0,
+      bool useShiftOpCode = false);
+
+   static TR::Node *findArrayIndexNode(TR::Compilation *comp, TR::Node *loadNode);
+   static TR::Node *findArrayBaseNode(TR::Compilation *comp, TR::Node *loadNode);
+
+   static bool transformDirectLoad(TR::Compilation *comp, TR::Node *node);
 
    /**
     * \brief
