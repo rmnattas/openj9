@@ -3453,7 +3453,7 @@ J9::ARM64::TreeEvaluator::VMnewEvaluator(TR::Node *node, TR::CodeGenerator *cg)
       {
       genInitArrayHeader(node, cg, clazz, resultReg, classReg, lengthReg, zeroReg, tempReg1, isBatchClearTLHEnabled, tlhHasNotBeenCleared);
 
-#ifdef J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION
+#ifdef TR_TARGET_64BIT
       if (TR::Compiler->om.isIndexableDataAddrPresent())
          {
          /* Here we'll update dataAddr slot for both fixed and variable length arrays. Fixed length arrays are
@@ -3523,7 +3523,7 @@ J9::ARM64::TreeEvaluator::VMnewEvaluator(TR::Node *node, TR::CodeGenerator *cg)
 
          generateMemSrc1Instruction(cg, TR::InstOpCode::strimmx, node, dataAddrSlotMR, firstDataElementReg);
          }
-#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
+#endif /* TR_TARGET_64BIT */
       if (generateArraylets)
          {
          // write arraylet pointer to object header
