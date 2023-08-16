@@ -2023,14 +2023,14 @@ MM_CopyForwardScheme::copy(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *
 
 				if (objectModel->isIndexable(destinationObjectPtr)) {
 					indexableObjectModel->fixupInternalLeafPointersAfterCopy((J9IndexableObject *)destinationObjectPtr, (J9IndexableObject *)forwardedHeader->getObject());
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_ENV_DATA64)
 					/**
 					 * Update the dataAddr internal field of the indexable object. The field being updated
 					 * points to the array data. In the case of contiguous data, it will point to the data
 					 * itself, and in case of discontiguous data, it will be NULL.
 					 */
 					indexableObjectModel->fixupDataAddr(forwardedHeader, destinationObjectPtr);
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_ENV_DATA64) */
 				}
 
 				objectModel->fixupHashFlagsAndSlot(forwardedHeader, destinationObjectPtr);
@@ -4081,7 +4081,7 @@ private:
 	}
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_ENV_DATA64)
 	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
 		env->_copyForwardStats._offHeapRegionCandidates += 1;
@@ -4103,7 +4103,7 @@ private:
 			}
 		}
 	}
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_ENV_DATA64) */
 
 	/**
 	 * @Clear the string table cache slot if the object is not marked

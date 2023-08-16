@@ -1668,11 +1668,11 @@ public:
 	}
 #endif /* defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_ENV_DATA64)
 	if (_includeVirtualLargeObjectHeap) {
 		scanObjectsInVirtualLargeObjectHeap(env);
 	}
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_ENV_DATA64) */
 
 	}
 	

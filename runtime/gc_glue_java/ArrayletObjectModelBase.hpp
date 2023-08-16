@@ -221,7 +221,7 @@ public:
 		}
 	}
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_ENV_DATA64)
 	/**
 	 * Set whether the virtual large object heap (off-heap) allocation for large objects is enabled.
 	 */
@@ -239,7 +239,7 @@ public:
 	{
 		_isIndexableDataAddrPresent = isDataAddressPresent;
 	}
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_ENV_DATA64) */
 
 	/**
 	 * Query if virtual large object heap (off-heap) allocation for large objects is enabled.
@@ -249,11 +249,11 @@ public:
 	MMINLINE bool
 	isVirtualLargeObjectHeapEnabled()
 	{
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_ENV_DATA64)
 		return _enableVirtualLargeObjectHeap;
-#else /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#else /* defined(J9VM_ENV_DATA64) */
 		return false;
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_ENV_DATA64) */
 	}
 
 	/**
