@@ -1371,7 +1371,7 @@ private:
     }
 #endif /* defined(J9VM_GC_ENABLE_DOUBLE_MAP) */
 
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
 		env->_markVLHGCStats._offHeapRegionCandidates += 1;
@@ -1383,7 +1383,7 @@ private:
 			}
 		}
 	}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 
 	/**
 	 * @Clear the string table cache slot if the object is not marked

@@ -154,24 +154,24 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 		/* Set the array size */
 		if (getAllocateDescription()->isChunkedArray()) {
 			indexableObjectModel->setSizeInElementsForDiscontiguous(spine, _numberOfIndexedFields);
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 			if (((J9JavaVM *)env->getLanguageVM())->isIndexableDataAddrPresent) {
 				indexableObjectModel->setDataAddrForDiscontiguous(spine, NULL);
 			}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 		} else {
 			indexableObjectModel->setSizeInElementsForContiguous(spine, _numberOfIndexedFields);
 			isArrayletDataAdjacentToHeader = indexableObjectModel->isArrayletDataAdjacentToHeader(spine);
 			if (isArrayletDataAdjacentToHeader) {
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 			if (((J9JavaVM *)env->getLanguageVM())->isIndexableDataAddrPresent) {
 				indexableObjectModel->setDataAddrForContiguous(spine);
 			}
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 			} else if (isAllIndexableDataContiguousEnabled) {
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 				indexableObjectModel->setDataAddrForContiguous(spine, NULL);
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 			}
 		}
 	}
@@ -180,7 +180,7 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 	/* Lay out arraylet and arrayoid pointers */
 	switch (_layout) {
 	case GC_ArrayletObjectModel::InlineContiguous:
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 		if (!isArrayletDataAdjacentToHeader) {
 			if (indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
 				/* We still need to create leaves for discontiguous arrays that will be allocated at off-heap */
@@ -201,7 +201,7 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 			}
 #endif /* defined (J9VM_GC_ENABLE_DOUBLE_MAP) */
 		}
-#endif /* defined (J9VM_ENV_DATA64) */
+#endif /* defined (J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 		if ((!isAllIndexableDataContiguousEnabled) || isArrayletDataAdjacentToHeader) {
 			Assert_MM_true(1 == _numberOfArraylets);
 		}
@@ -442,7 +442,7 @@ MM_IndexableObjectAllocationModel::reserveLeavesForContiguousArraylet(MM_Environ
 }
 #endif
 
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 MMINLINE J9IndexableObject *
 MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_EnvironmentBase *env, J9IndexableObject *spine)
 {
@@ -524,7 +524,7 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 
 	return spine;
 }
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 
 #if defined(J9VM_GC_ENABLE_DOUBLE_MAP)
 #if !((defined(LINUX) || defined(OSX)) && defined(J9VM_ENV_DATA64))
