@@ -106,9 +106,9 @@ public:
          TR::Compilation *comp,
          TR::Node *object);
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(TR_TARGET_64BIT)
    static TR::Node *generateDataAddrLoadTrees(TR::Compilation *comp, TR::Node *arrayObject);
-#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
+#endif /* TR_TARGET_64BIT */
    static TR::Node *generateArrayAddressTrees(
       TR::Compilation *comp,
       TR::Node *arrayNode,

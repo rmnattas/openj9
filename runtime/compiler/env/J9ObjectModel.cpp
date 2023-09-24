@@ -691,13 +691,13 @@ J9::ObjectModel::getAddressOfElement(TR::Compilation* comp, uintptr_t objectPoin
    // If the array is contiguous, return the addition of objectPointer and offset
    if (!TR::Compiler->om.isDiscontiguousArray(comp, objectPointer))
       {
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(TR_TARGET_64BIT)
       if (TR::Compiler->om.isOffHeapAllocationEnabled())
          {
          basePointer = *(uintptr_t *)(objectPointer + TR::Compiler->om.offsetOfContiguousDataAddrField());
          totalOffset = offset - static_cast<int32_t>(TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
 	 }
-#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
+#endif /* TR_TARGET_64BIT */
       return basePointer + totalOffset;
       }
 
@@ -814,11 +814,11 @@ J9::ObjectModel::isIndexableDataAddrPresent()
       return vmInfo->_isIndexableDataAddrPresent;
       }
 #endif /* defined(J9VM_OPT_JITSERVER) */
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_ENV_DATA64)
    return FALSE != TR::Compiler->javaVM->isIndexableDataAddrPresent;
 #else
    return false;
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_ENV_DATA64) */
    }
 
 MM_GCReadBarrierType

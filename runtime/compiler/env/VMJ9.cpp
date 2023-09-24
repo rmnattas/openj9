@@ -4100,7 +4100,7 @@ TR_J9VMBase::initializeLocalArrayHeader(TR::Compilation * comp, TR::Node * alloc
    node = TR::Node::createWithSymRef(TR::istorei, 2, 2, allocationNode, node, arraySizeSymRef);
    prevTree = TR::TreeTop::create(comp, prevTree, node);
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(TR_TARGET_64BIT)
    if (TR::Compiler->om.isIndexableDataAddrPresent())
       {
       // -----------------------------------------------------------------------------------
@@ -4113,7 +4113,7 @@ TR_J9VMBase::initializeLocalArrayHeader(TR::Compilation * comp, TR::Node * alloc
       TR::Node *storeDataAddrPointerNode = TR::Node::createWithSymRef(TR::astorei, 2, allocationNode, startOfDataNode, 0, dataAddrFieldOffsetSymRef);
       prevTree = TR::TreeTop::create(comp, prevTree, storeDataAddrPointerNode);
       }
-#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
+#endif /* TR_TARGET_64BIT */
    }
 
 
