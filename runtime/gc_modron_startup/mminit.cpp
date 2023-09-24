@@ -2810,9 +2810,9 @@ configurateGCWithPolicyAndOptions(OMR_VM* omrVM)
 
 	case gc_policy_balanced:
 		extensions->gcModeString = "-Xgcpolicy:balanced";
-#if defined(J9VM_ENV_DATA64)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
 		extensions->isVirtualLargeObjectHeapRequested = true;
-#endif /* defined(J9VM_ENV_DATA64) */
+#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
 		omrVM->gcPolicy = J9_GC_POLICY_BALANCED;
 		result = MM_ConfigurationIncrementalGenerational::newInstance(&env);
 		break;

@@ -647,11 +647,11 @@ void J9FASTCALL _jitProfileStringValue(uintptr_t value, int32_t charsOffset, int
 
       J9JavaVM *jvm = jitConfig->javaVM;
       uintptr_t startOfData = 0;
-#if defined(TR_TARGET_64BIT)
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
       if (TR::Compiler->om.isOffHeapAllocationEnabled())
          startOfData = *(uintptr_t *) (value + TR::Compiler->om.offsetOfContiguousDataAddrField());
       else
-#endif /* TR_TARGET_64BIT */
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
          {
          startOfData = (uintptr_t) (value + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
          }
