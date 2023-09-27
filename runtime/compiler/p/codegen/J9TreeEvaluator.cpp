@@ -7460,7 +7460,7 @@ TR::Register *J9::Power::TreeEvaluator::VMmonentEvaluator(TR::Node *node, TR::Co
       return targetRegister;
       }
 
-   int32_t numDeps = 6;
+   int32_t numDeps = 7;
 
    TR::Node *objNode = node->getFirstChild();
    TR::Register *objReg = cg->evaluate(objNode);
@@ -7468,6 +7468,7 @@ TR::Register *J9::Power::TreeEvaluator::VMmonentEvaluator(TR::Node *node, TR::Co
    TR::Register *monitorReg = cg->allocateRegister();
    TR::Register *offsetReg = cg->allocateRegister();
    TR::Register *tempReg = cg->allocateRegister();
+   TR::Register *temp2Reg = cg->allocateRegister();
 
    TR::Register *objectClassReg = cg->allocateRegister();
    TR::Register *lookupOffsetReg = NULL;
@@ -7500,6 +7501,7 @@ TR::Register *J9::Power::TreeEvaluator::VMmonentEvaluator(TR::Node *node, TR::Co
    TR::addDependency(conditions, offsetReg, TR::RealRegister::NoReg, TR_GPR, cg);
 
    TR::addDependency(conditions, tempReg, TR::RealRegister::NoReg, TR_GPR, cg);
+   TR::addDependency(conditions, temp2Reg, TR::RealRegister::NoReg, TR_GPR, cg);
 
    TR::addDependency(conditions, objectClassReg, TR::RealRegister::NoReg, TR_GPR, cg);
    conditions->getPreConditions()->getRegisterDependency(conditions->getAddCursorForPre() - 1)->setExcludeGPR0();
@@ -7707,15 +7709,29 @@ TR::Register *J9::Power::TreeEvaluator::VMmonentEvaluator(TR::Node *node, TR::Co
 
       generateTrg1MemInstruction(cg, loadOpCode, node, monitorReg, TR::MemoryReference::createWithDisplacement(cg, baseReg, lwOffset, lockSize));
 
-      generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, monitorReg, 0);
+      generateTrg1ImmInstruction(cg, TR::InstOpCode::li, node, tempReg, LOCK_RESERVATION_BIT);
+      generateTrg1Src2Instruction(cg, TR::InstOpCode::andc_r, node, tempReg, monitorReg, tempReg);
+
       generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, incrementCheckLabel, condReg);
       generateTrg1ImmInstruction(cg, TR::InstOpCode::li, node, offsetReg, lwOffset);
 
+      if (8 == lockSize)
+         {
+         generateShiftLeftImmediateLong(cg, node, temp2Reg, monitorReg, 2); //TODO: don't hardcode shift amount
+         }
+      else
+         {
+         generateShiftLeftImmediate(cg, node, temp2Reg, monitorReg, 2); //TODO: don't hardcode shift amount
+         }
+
+      generateTrg1Src2Instruction(cg, TR::InstOpCode::OR, node, temp2Reg, temp2Reg, monitorReg);
+      generateTrg1Src2Instruction(cg, TR::InstOpCode::OR, node, temp2Reg, temp2Reg, metaReg);
+
       generateLabelInstruction(cg, TR::InstOpCode::label, node, loopLabel);
-      generateTrg1MemInstruction(cg, reservedLoadOpCode, PPCOpProp_LoadReserveExclusiveAccess, node, monitorReg, TR::MemoryReference::createWithIndexReg(cg, baseReg, offsetReg, lockSize));
-      generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, monitorReg, 0);
+      generateTrg1MemInstruction(cg, reservedLoadOpCode, PPCOpProp_LoadReserveExclusiveAccess, node, tempReg, TR::MemoryReference::createWithIndexReg(cg, baseReg, offsetReg, lockSize));
+      generateTrg1Src2Instruction(cg, compareLogicalOpCode, node, condReg, tempReg, monitorReg);
       generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, callLabel, condReg);
-      generateMemSrc1Instruction(cg, conditionalStoreOpCode, node, TR::MemoryReference::createWithIndexReg(cg, baseReg, offsetReg, lockSize), metaReg);
+      generateMemSrc1Instruction(cg, conditionalStoreOpCode, node, TR::MemoryReference::createWithIndexReg(cg, baseReg, offsetReg, lockSize), temp2Reg);
 
       generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, PPCOpProp_BranchUnlikely, node, loopLabel, condReg);
 
