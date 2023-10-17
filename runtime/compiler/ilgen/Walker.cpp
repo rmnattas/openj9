@@ -38,6 +38,7 @@
 #include "exceptions/FSDFailure.hpp"
 #include "exceptions/RuntimeFailure.hpp"
 #include "optimizer/TransformUtil.hpp"
+#include "il/AutomaticSymbol.hpp"
 #include "il/Node.hpp"
 #include "il/Node_inlines.hpp"
 #include "il/TreeTop.hpp"
@@ -2004,38 +2005,45 @@ TR_J9ByteCodeIlGenerator::genArrayBoundsCheck(TR::Node * offset, int32_t width)
 void
 TR_J9ByteCodeIlGenerator::calculateElementAddressInContiguousArray(int32_t width, int32_t headerSize)
    {
+   traceMsg(comp(), "In calculateElementAddressInContiguousArray\n");
    const bool isForArrayAccess = true;
    int32_t shift = TR::TransformUtil::convertWidthToShift(width);
    if (shift)
       {
+      traceMsg(comp(), "shift > 0 (i.e., is true)\n");
       loadConstant(TR::iconst, shift);
       // generate a TR::aladd instead if required
       if (comp()->target().is64Bit())
          {
-         // stack is now ...index,shift<===
+         // stack is now ...aryRef,index,shift<===
          TR::Node *second = pop();
          genUnary(TR::i2l, isForArrayAccess);
          push(second);
          genBinary(TR::lshl);
+         // stack is now ...aryRef,index+shift<===
          }
       else
          genBinary(TR::ishl);
       }
+   // stack is now ...aryRef,index+shift<===
    if (comp()->target().is64Bit())
       {
       if (headerSize > 0)
          {
+         traceMsg(comp(), "64 bit and headerSize > 0\n");
          loadConstant(TR::lconst, (int64_t)headerSize);
          // shift could have been null here (if no scaling is done for the index
          // ...so check for that and introduce an i2l if required for the aladd
-         // stack now is ....index,loadConst<===
+         // stack now is ....aryRef,index,loadConst<===
          if (!shift)
             {
             TR::Node *second = pop();
             genUnary(TR::i2l, isForArrayAccess);
             push(second);
             }
+         // stack now is ....aryRef,index,loadConst<===
          genBinary(TR::ladd);
+         // stack now is ....aryRef,index+loadConst<===
          }
       else if ((headerSize == 0) && (!shift))
          {
@@ -2043,6 +2051,7 @@ TR_J9ByteCodeIlGenerator::calculateElementAddressInContiguousArray(int32_t width
          }
 
       genBinary(TR::aladd);
+      // stack now is ....aryRef+index+loadConst<===
       }
    else
       {
@@ -2054,6 +2063,42 @@ TR_J9ByteCodeIlGenerator::calculateElementAddressInContiguousArray(int32_t width
       genBinary(TR::aiadd);
       }
    }
+
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+void
+TR_J9ByteCodeIlGenerator::calculateElementAddressInContiguousArray(int32_t width)
+   {
+   // TODO: fatal assert to make sure off heap allocation is enabled
+   // TODO: change method name to calculateElementAddressInContiguousArrayUsingDataAddrField
+
+   traceMsg(comp(), "In calculateElementAddressInContiguousArray(int32_t)\n");
+   const bool isForArrayAccess = true;
+   int32_t shift = TR::TransformUtil::convertWidthToShift(width);
+
+   // Stack is now ...,aryRef,index<===
+   TR::Node* index = pop();
+   TR::Node* arrayBase = pop();
+
+   traceMsg(comp(), "walker.cpp:createContiguousArrayView: entering method.\n");
+   TR::Node *firstArrayElementAddress = TR::TransformUtil::generateDataAddrLoadTrees(comp(), arrayBase);
+   push(firstArrayElementAddress);
+   push(index);
+
+   // stack is now ...,firstArrayElement,index<===
+   genUnary(TR::i2l, isForArrayAccess);
+
+   if (shift)
+      {
+      traceMsg(comp(), "shift > 0 (i.e., is true)\n");
+      loadConstant(TR::iconst, shift);
+      // stack is now ...,aryRef,firstArrayElement,index,shift<===
+      genBinary(TR::lshl);
+      }
+
+   // stack is now ...,firstArrayElement,shift/index<===
+   genBinary(TR::aladd);
+   }
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
 
 // Helper to calculate the index of the array element in a contiguous array
 // Stack: ..., offset for array element index
@@ -2137,8 +2182,20 @@ TR_J9ByteCodeIlGenerator::calculateArrayElementAddress(TR::DataType dataType, bo
       push(index);
    }
 
+   static bool enableDataAddrFieldLoad = (feGetEnv("sverma_EnableDataAddrFieldLoad") != NULL);
    // Stack is now ...,aryRef,index<===
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+   if (fej9()->isOffHeapAllocationEnabled())
+      {
+      // stack is now ...,aryRef,index<===
+      calculateElementAddressInContiguousArray(width);
+      // stack is now ...,firstArrayElement+index/shift<===
+      _stack->top()->setIsInternalPointer(true);
+      }
+   else if (comp()->generateArraylets())
+#else
    if (comp()->generateArraylets())
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
       {
       // shift the index on the current stack to get index into array spine
       loadConstant(TR::iconst, fej9()->getArraySpineShift(width));
@@ -5917,6 +5974,7 @@ TR_J9ByteCodeIlGenerator::loadArrayElement(TR::DataType dataType, TR::ILOpCodes 
       return;
       }
 
+   traceMsg(comp(), "In loadArrayElement\n");
    bool genSpineChecks = comp()->requiresSpineChecks();
 
    _suppressSpineChecks = false;
@@ -5948,6 +6006,7 @@ TR_J9ByteCodeIlGenerator::loadArrayElement(TR::DataType dataType, TR::ILOpCodes 
 
       if (comp()->useCompressedPointers())
          {
+         traceMsg(comp(), "Walker.cpp:loadArrayElement: about to generate compressed refs\n");
          // Returns non-null if the compressedRefs anchor is going to
          // be part of the subtrees
          //
@@ -6705,40 +6764,14 @@ TR_J9ByteCodeIlGenerator::genNewArray(int32_t typeIndex)
       {
       node->setCanSkipZeroInitialization(true);
 
-      TR::Node *arrayRefNode;
-      int32_t hdrSize = (int32_t) TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
-      bool is64BitTarget = comp()->target().is64Bit();
-
-      if (is64BitTarget)
-         {
-         TR::Node *constantNode = TR::Node::create(node, TR::lconst);
-         constantNode->setLongInt((int64_t)hdrSize);
-         arrayRefNode = TR::Node::create(TR::aladd, 2, node, constantNode);
-         }
-      else
-         arrayRefNode = TR::Node::create(TR::aiadd, 2, node, TR::Node::create(node, TR::iconst, 0, hdrSize));
-
+      TR::Node *arrayRefNode = TR::TransformUtil::generateArrayStartTrees(comp(), node);
       arrayRefNode->setIsInternalPointer(true);
 
-      TR::Node *sizeInBytes;
       TR::Node *sizeNode = node->getFirstChild();
+      int32_t elementSize = TR::Compiler->om.getSizeOfArrayElement(node);
+      TR::Node *sizeInBytes = TR::TransformUtil::generateArrayOffsetTrees(comp(), sizeNode, NULL, elementSize);
 
       TR::Node* constValNode = TR::Node::bconst(node, (int8_t)0);
-      int32_t elementSize = TR::Compiler->om.getSizeOfArrayElement(node);
-
-      if (is64BitTarget)
-         {
-         TR::Node *stride = TR::Node::create(node, TR::lconst);
-         stride->setLongInt((int64_t) elementSize);
-         TR::Node *i2lNode = TR::Node::create(TR::i2l, 1, sizeNode);
-         sizeInBytes = TR::Node::create(TR::lmul, 2, i2lNode, stride);
-         }
-      else
-         {
-         TR::Node *stride = TR::Node::create(node, TR::iconst, 0, elementSize);
-         sizeInBytes = TR::Node::create(TR::imul, 2, sizeNode, stride);
-         }
-
       TR::Node *arraysetNode = TR::Node::create(TR::arrayset, 3, arrayRefNode, constValNode, sizeInBytes);
       TR::SymbolReference *arraySetSymRef = comp()->getSymRefTab()->findOrCreateArraySetSymbol();
       arraysetNode->setSymbolReference(arraySetSymRef);
@@ -7121,6 +7154,7 @@ TR_J9ByteCodeIlGenerator::storeInstance(TR::SymbolReference * symRef)
          // returns non-null if the compressedRefs anchor is going to
          // be part of the subtrees (for now, it is a treetop)
          //
+         traceMsg(comp(), "Walker.cpp:storeInstance: about to generate compressed refs\n");
          TR::Node *newValue = genCompressedRefs(storeValue, true, -1);
          if (newValue)
             {
@@ -7462,6 +7496,7 @@ TR_J9ByteCodeIlGenerator::storeAuto(TR::DataType type, int32_t slot, bool isAdju
 void
 TR_J9ByteCodeIlGenerator::storeArrayElement(TR::DataType dataType, TR::ILOpCodes nodeop, bool checks)
    {
+   traceMsg(comp(), "In storeArrayElement\n");
    TR::Node * value = pop();
 
    handlePendingPushSaveSideEffects(value);
@@ -7499,6 +7534,8 @@ TR_J9ByteCodeIlGenerator::storeArrayElement(TR::DataType dataType, TR::ILOpCodes
 
    calculateArrayElementAddress(dataType, true);
 
+   // TODO: The node variable names don't look right. arrayBaseAddress is actually
+   //       the second item on the stack.
    TR::Node * arrayBaseAddress = pop();
    bool usedArrayBaseAddress = false;
    TR::Node * elementAddress = pop();
@@ -7526,6 +7563,7 @@ TR_J9ByteCodeIlGenerator::storeArrayElement(TR::DataType dataType, TR::ILOpCodes
       {
       if (_stack->top()->getOpCode().isSpineCheck())
          {
+         traceMsg(comp(), "Walker: There was a spinecheck!");
          checkNode = pop();
          usedArrayBaseAddress = true;
          }
@@ -7593,6 +7631,7 @@ TR_J9ByteCodeIlGenerator::storeArrayElement(TR::DataType dataType, TR::ILOpCodes
 
    if (genTranslateTT)
       {
+      traceMsg(comp(), "Walker.cpp:storeArrayElement: about to generate compressed refs\n");
       TR::Node *newValue = genCompressedRefs(storeNode, true, -1);
       if (newValue)
          {
