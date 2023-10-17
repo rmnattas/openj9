@@ -679,6 +679,15 @@ J9::ObjectModel::getAddressOfElement(TR::Compilation* comp, uintptr_t objectPoin
              offset < TR::Compiler->om.getArrayLengthInBytes(comp, objectPointer) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes(), "Array is out of bound");
 
    // If the array is contiguous, return the addition of objectPointer and offset
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+   // Arrays in offheap runs are always contiguous
+   if (TR::Compiler->om.isOffHeapAllocationEnabled())
+      {
+      objectPointer = *(uintptr_t *)(objectPointer + TR::Compiler->om.offsetOfContiguousDataAddrField());
+      offset = offset - static_cast<int32_t>(TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+      return objectPointer + offset;
+      }
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
    if (!TR::Compiler->om.isDiscontiguousArray(comp, objectPointer))
       return objectPointer + offset;
 
