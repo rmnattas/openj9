@@ -1000,7 +1000,7 @@ TR_J9InlinerPolicy::genCodeForUnsafeGetPut(TR::Node* unsafeAddress,
          traceMsg(comp(),"\t\t Generating an isArray test as j9class of java/lang/Class is NULL");
          directAccessBlock->getEntry()->insertTreeTopsBeforeMe(lowTagCmpBlock->getEntry(), lowTagCmpBlock->getExit());
          lowTagCmpTree->getNode()->setBranchDestination(indirectAccessBlock->getEntry());
-         }     
+         }
 
       lowTagCmpBlock->getEntry()->insertTreeTopsBeforeMe(isArrayBlock->getEntry(),
                                                          isArrayBlock->getExit());
@@ -1014,7 +1014,7 @@ TR_J9InlinerPolicy::genCodeForUnsafeGetPut(TR::Node* unsafeAddress,
          TR::Block *indirectNextBlock = indirectAccessBlock->getExit()->getNextTreeTop()->getEnclosingBlock();
          TR::Block *directPrevBlock = directAccessBlock->getEntry()->getPrevTreeTop()->getEnclosingBlock();
          TR::Block *directNextBlock = directAccessBlock->getExit()->getNextTreeTop()->getEnclosingBlock();
-         
+
          indirectAccessBlock->getEntry()->setPrevTreeTop(directPrevBlock->getExit());
          directPrevBlock->getExit()->setNextTreeTop(indirectAccessBlock->getEntry());
          indirectAccessBlock->getExit()->setNextTreeTop(directNextBlock->getEntry());
@@ -1034,7 +1034,7 @@ TR_J9InlinerPolicy::genCodeForUnsafeGetPut(TR::Node* unsafeAddress,
             //of the conditional branch in the lowTagCmp block so that it can reach the indirectAccessBlock
             TR::ILOpCodes lowTagCmpOpCode = lowTagCmpTree->getNode()->getOpCodeValue();
             TR::ILOpCodes newOpCode = lowTagCmpOpCode == TR::ificmpne ? TR::ificmpeq : TR::iflcmpeq;
-            
+
             lowTagCmpTree->getNode()->getOpCode().setOpCodeValue(newOpCode);
             lowTagCmpTree->getNode()->setBranchDestination(indirectAccessBlock->getEntry());
          }
@@ -1091,7 +1091,7 @@ TR_J9InlinerPolicy::genCodeForUnsafeGetPut(TR::Node* unsafeAddress,
 
    if (arrayCheckNeeded && arrayBlockNeeded)
       cfg->removeEdge(nullComparisonBlock, arrayDirectAccessBlock);
-      
+
    if (needNullCheck)
       {
       TR::TreeTop *treeBeforeCmp = nullComparisonTree->getPrevTreeTop();
@@ -1125,7 +1125,11 @@ indirect write/read. The selection of alternatives is done by looking at three c
 a) whether the object is NULL
 b) whether the object is array
 c) whether the object is of type java.lang.Class
-The pseudocode of the generated inline code for case (1) under normal compilation is :
+
+When the type of the object is unknown at compile time, several runtime checks will be
+generated to determine which type of read/write should be used.
+
+The pseudocode of the generated inline code for case (1) under normal compilation and gencon GC policy is :
 if (object == NULL)
   use direct access
 else if (offset is not low tagged)
@@ -1135,7 +1139,8 @@ else if (object is type of java/lang/Class)
 else
   use direct access
 
-If we can not get the J9Class of java/lang/Class, we generate following sequence of tests
+If we can not get the J9Class of java/lang/Class OR if offheap allocation and balanced GC policy is
+in use, we generate following sequence of tests:
 if (object == NULL)
    use direct access
 else if (object it Array type)
@@ -1208,7 +1213,7 @@ TR_J9InlinerPolicy::createUnsafePutWithOffset(TR::ResolvedMethodSymbol *calleeSy
 
 
    bool conversionNeeded = comp()->fe()->dataTypeForLoadOrStore(type) != type;
-   
+
    // If we are not able to get javaLangClass it is still inefficient to put direct Access far
    // So in that case we will generate lowTagCmpTest to branch to indirect access if true
    TR_OpaqueClassBlock *javaLangClass = comp()->getClassClassPointer(/* isVettedForAOT = */ true);
@@ -1223,11 +1228,11 @@ TR_J9InlinerPolicy::createUnsafePutWithOffset(TR::ResolvedMethodSymbol *calleeSy
 
       int objSigLength = strlen("Ljava/lang/Object;");
       int classSigLength = strlen("Ljava/lang/Class;");
-      
+
       // There are two cases where IL for type checks (array, class, lowtag) needs to be generated:
-      // 1.) Object type is unknown at compile time 
+      // 1.) Object type is unknown at compile time
       // 2.) Object is known at compile time to be a java/lang/Class object (to match JNI implementation)
-      checksNeeded = objTypeSig == NULL || strncmp(objTypeSig, "Ljava/lang/Object;", objSigLength) == 0 || strncmp(objTypeSig, "Ljava/lang/Class;", classSigLength) == 0;
+      checksNeeded = (objTypeSig == NULL) || (strncmp(objTypeSig, "Ljava/lang/Object;", objSigLength) == 0) || (strncmp(objTypeSig, "Ljava/lang/Class;", classSigLength) == 0);
 
       // We need to generate IL for the array check if we have determined that IL type checks are needed (i.e.: checksNeeded == true) AND
       // at least one of the following conditions holds:
@@ -1239,10 +1244,10 @@ TR_J9InlinerPolicy::createUnsafePutWithOffset(TR::ResolvedMethodSymbol *calleeSy
       // We need to generate arrayDirectAccessBlock if at least one of the following conditions holds:
       // - conversionNeeded == true AND checksNeeded == true
       // - offheap is enabled AND (object is known be an array at compile time OR object type is unknown at compile time)
-      arrayBlockNeeded = checksNeeded && conversionNeeded || TR::Compiler->om.isOffHeapAllocationEnabled() && comp()->target().is64Bit() &&
-                                                             (objTypeSig == NULL || strncmp(objTypeSig, "Ljava/lang/Object;", objSigLength) == 0 || objTypeSig[0] == '[');
+      arrayBlockNeeded = (checksNeeded && conversionNeeded) || (TR::Compiler->om.isOffHeapAllocationEnabled() && comp()->target().is64Bit() &&
+                                                               (objTypeSig == NULL || strncmp(objTypeSig, "Ljava/lang/Object;", objSigLength) == 0 || objTypeSig[0] == '['));
    }
-   else // if object is NULL, we want to treat it the same way as we would a non-array, non-class, non-java/lang/Object object (i.e.: use direct access) 
+   else // if object is NULL, we want to treat it the same way as we would a non-array, non-class, non-java/lang/Object object (i.e.: use direct access)
    {
       checksNeeded = false;
       arrayCheckNeeded = false;
@@ -1339,7 +1344,7 @@ TR_J9InlinerPolicy::createUnsafePutWithOffset(TR::ResolvedMethodSymbol *calleeSy
       }
 
    // We need to generate an arrayDirectAccessBlock AND a directAccessBlock in the following cases:
-   // 1.) arrayCheckNeeded == true: arrayDirectAccessBlock used for array access, 
+   // 1.) arrayCheckNeeded == true: arrayDirectAccessBlock used for array access,
    //                               directAccessBlock used for non-array/non-class object access
    // 2.) !arrayCheckNeeded && arrayBlockNeeded: arrayDirectAccessBlock used for array access,
    //                                            directAccessBlock used if object is NULL
@@ -1422,14 +1427,14 @@ TR_J9InlinerPolicy::createUnsafePutWithOffset(TR::ResolvedMethodSymbol *calleeSy
       {
          adjustedOffset = TR::Node::create(TR::ladd, 2, oldOffset, TR::Node::lconst(-TR::Compiler->om.contiguousArrayHeaderSizeInBytes()));
       }
-      
+
       addrToAccessNode->setChild(1, adjustedOffset);
-      oldOffset->decReferenceCount();  
+      oldOffset->decReferenceCount();
    }
 #endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
 
    TR::Block *joinBlock;
-   
+
    // SPECIAL CASE: if object is known to be array, we want the following control flow:
    // if (unsafeAddress == NULL) goto directAccessBlock
    // else goto arrayDirectAccessBlock
@@ -1554,11 +1559,11 @@ TR_J9InlinerPolicy::createUnsafeCASCallDiamond( TR::TreeTop *callNodeTreeTop, TR
    // (A low tagged offset value means the object being passed in is a java/lang/Class object, and we want a static field)
 
    // Regarding which checks/diamonds get generated, there are three possible cases:
-   // 1.) Only the low tagged check is generated. This will occur either when gencon GC policy is being used, or under 
-   //     balanced GC policy with offheap allocation enabled if the object being operated on is known NOT to be an array 
+   // 1.) Only the low tagged check is generated. This will occur either when gencon GC policy is being used, or under
+   //     balanced GC policy with offheap allocation enabled if the object being operated on is known NOT to be an array
    //     at compile time.
    // 2.) No checks are generated. This will occur under balanced GC policy with offheap allocation enabled if the object
-   //     being operated on is known to be an array at compile time (since if the object is an array, it can't also be a 
+   //     being operated on is known to be an array at compile time (since if the object is an array, it can't also be a
    //     java/lang/Class object).
    // 3.) Both the array and low tagged checks are generated. This will occur under balanced GC policy with offheap allocation
    //     enabled if the type of the object being operated on is unknown at compile time.
@@ -1572,18 +1577,18 @@ TR_J9InlinerPolicy::createUnsafeCASCallDiamond( TR::TreeTop *callNodeTreeTop, TR
    int objSigLength = strlen("Ljava/lang/Object;");
 
    //only generate array check in case (3)
-   bool arrayCheckNeeded = TR::Compiler->om.isOffHeapAllocationEnabled() && comp()->target().is64Bit() && 
+   bool arrayCheckNeeded = TR::Compiler->om.isOffHeapAllocationEnabled() && comp()->target().is64Bit() &&
                            (objTypeSig == NULL || strncmp(objTypeSig, "Ljava/lang/Object;", objSigLength) == 0);
 
    //only generate separate array access block in cases (2) or (3)
-   bool arrayBlockNeeded = TR::Compiler->om.isOffHeapAllocationEnabled() && comp()->target().is64Bit() && 
+   bool arrayBlockNeeded = TR::Compiler->om.isOffHeapAllocationEnabled() && comp()->target().is64Bit() &&
                            (arrayCheckNeeded || objTypeSig[0] == '[');
 
    createTempsForUnsafeCall(callNodeTreeTop, callNode);
 
    TR::Node *offsetNode = callNode->getChild(2);
    TR::TreeTop *compareTree;
-   
+
    //do not generate low tagged check in case (2)
    if (!arrayCheckNeeded && arrayBlockNeeded)
       compareTree = NULL;
@@ -1712,14 +1717,14 @@ TR_J9InlinerPolicy::createUnsafeCASCallDiamond( TR::TreeTop *callNodeTreeTop, TR
       callBlock->createConditionalBlocksBeforeTree(callNodeTreeTop, isArrayTreeTop, arrayAccessTreeTop, nonArrayAccessTreeTop, comp()->getFlowGraph(), false, false);
       nonArrayAccessTreeTop->getEnclosingBlock()->createConditionalBlocksBeforeTree(nonArrayAccessTreeTop, compareTree, ifTree, elseTree, comp()->getFlowGraph(), false, false);
    }
-   else if (arrayBlockNeeded) //in case (2), no branching is needed: we simply need to replace the original CAS call with the modified array access block 
+   else if (arrayBlockNeeded) //in case (2), no branching is needed: we simply need to replace the original CAS call with the modified array access block
    {
       callNodeTreeTop->insertAfter(arrayAccessTreeTop);
       callNodeTreeTop->getPrevTreeTop()->join(callNodeTreeTop->getNextTreeTop());
       callBlock->split(arrayAccessTreeTop->getNextTreeTop(), comp()->getFlowGraph(), true);
       callBlock->split(arrayAccessTreeTop, comp()->getFlowGraph(), true);
    }
-   else if (compareTree != NULL) //in case (1), we only generate the low tagged check diamond 
+   else if (compareTree != NULL) //in case (1), we only generate the low tagged check diamond
       callBlock->createConditionalBlocksBeforeTree(callNodeTreeTop, compareTree, ifTree, elseTree, comp()->getFlowGraph(), false, false);
 
 
@@ -1801,9 +1806,9 @@ TR_J9InlinerPolicy::createUnsafeGetWithOffset(TR::ResolvedMethodSymbol *calleeSy
       int classSigLength = strlen("Ljava/lang/Class;");
 
       // There are two cases where IL for type checks (array, class, lowtag) needs to be generated:
-      // 1.) Object type is unknown at compile time 
+      // 1.) Object type is unknown at compile time
       // 2.) Object is known at compile time to be a java/lang/Class object (to match JNI implementation)
-      checksNeeded = objTypeSig == NULL || strncmp(objTypeSig, "Ljava/lang/Object;", objSigLength) == 0 || strncmp(objTypeSig, "Ljava/lang/Class;", classSigLength) == 0;
+      checksNeeded = (objTypeSig == NULL) || (strncmp(objTypeSig, "Ljava/lang/Object;", objSigLength) == 0) || (strncmp(objTypeSig, "Ljava/lang/Class;", classSigLength) == 0);
 
       // We need to generate IL for the array check if we have determined that IL type checks are needed (i.e.: checksNeeded == true) AND
       // at least one of the following conditions holds:
@@ -1815,10 +1820,10 @@ TR_J9InlinerPolicy::createUnsafeGetWithOffset(TR::ResolvedMethodSymbol *calleeSy
       // We need to generate arrayDirectAccessBlock if at least one of the following conditions holds:
       // - conversionNeeded == true AND checksNeeded == true
       // - offheap is enabled AND (object is known be an array at compile time OR object type is unknown at compile time)
-      arrayBlockNeeded = checksNeeded && conversionNeeded || TR::Compiler->om.isOffHeapAllocationEnabled() && comp()->target().is64Bit() &&
-                                                             (objTypeSig == NULL || strncmp(objTypeSig, "Ljava/lang/Object;", objSigLength) == 0 || objTypeSig[0] == '[');
+      arrayBlockNeeded = (checksNeeded && conversionNeeded) || (TR::Compiler->om.isOffHeapAllocationEnabled() && comp()->target().is64Bit() &&
+                                                               (objTypeSig == NULL || strncmp(objTypeSig, "Ljava/lang/Object;", objSigLength) == 0 || objTypeSig[0] == '['));
    }
-   else // if object is NULL, we want to treat it the same way as we would a non-array, non-class, non-java/lang/Object object (i.e.: use direct access) 
+   else // if object is NULL, we want to treat it the same way as we would a non-array, non-class, non-java/lang/Object object (i.e.: use direct access)
    {
       checksNeeded = false;
       arrayCheckNeeded = false;
@@ -1909,7 +1914,7 @@ TR_J9InlinerPolicy::createUnsafeGetWithOffset(TR::ResolvedMethodSymbol *calleeSy
       genDirectAccessCodeForUnsafeGetPut(callNodeTreeTop->getNode(), false, true);
 
    // We need to generate an arrayDirectAccessBlock AND a directAccessBlock in the following cases:
-   // 1.) arrayCheckNeeded == true: arrayDirectAccessBlock used for array access, 
+   // 1.) arrayCheckNeeded == true: arrayDirectAccessBlock used for array access,
    //                               directAccessBlock used for non-array/non-class object access
    // 2.) !arrayCheckNeeded && arrayBlockNeeded: arrayDirectAccessBlock used for array access,
    //                                            directAccessBlock used if object is NULL
@@ -1976,12 +1981,12 @@ TR_J9InlinerPolicy::createUnsafeGetWithOffset(TR::ResolvedMethodSymbol *calleeSy
       }
 
       addrToAccessNode->setChild(1, adjustedOffset);
-      oldOffset->decReferenceCount();      
+      oldOffset->decReferenceCount();
    }
 #endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
 
    TR::Block *joinBlock;
-   
+
    // SPECIAL CASE: if object is known to be array, we want the following control flow:
    // if (unsafeAddress == NULL) goto directAccessBlock
    // else goto arrayDirectAccessBlock
@@ -1999,7 +2004,7 @@ TR_J9InlinerPolicy::createUnsafeGetWithOffset(TR::ResolvedMethodSymbol *calleeSy
       createAnchorNodesForUnsafeGetPut(arrayDirectAccessTreeTop, type, true);
    genCodeForUnsafeGetPut(unsafeAddress, callNodeTreeTop, prevTreeTop,
                           newSymbolReferenceForAddress, directAccessTreeTop,
-                          lowTagCmpTree, needNullCheck, true, conversionNeeded, 
+                          lowTagCmpTree, needNullCheck, true, conversionNeeded,
                           arrayCheckNeeded, arrayBlockNeeded, checksNeeded,
                           joinBlock, javaLangClass);
 
