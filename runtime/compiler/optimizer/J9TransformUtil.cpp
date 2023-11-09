@@ -155,30 +155,29 @@ TR::Node *
 J9::TransformUtil::generateArrayOffsetTrees(TR::Compilation *comp, TR::Node *indexNode, TR::Node *elementSizeNode, int32_t elementSize, bool useShiftOpCode)
    {
    TR::Node *offsetNode = indexNode->createLongIfNeeded();
+   TR::Node *strideNode = elementSizeNode;
+   if (strideNode)
+      strideNode = strideNode->createLongIfNeeded();
 
-   if (elementSizeNode != NULL || elementSize > 1)
+   if (strideNode != NULL || elementSize > 1)
       {
-      TR::Node *newElementSizeNode = NULL;
-      if (elementSizeNode)
-         newElementSizeNode = elementSizeNode->convertStoreDirectToLoadWithI2LIfNeeded();
-
       TR::ILOpCodes offsetOpCode = TR::BadILOp;
       if (comp->target().is64Bit())
          {
-         if (newElementSizeNode == NULL && elementSize > 1)
-            newElementSizeNode = TR::Node::lconst(indexNode, elementSize);
+         if (strideNode == NULL && elementSize > 1)
+            strideNode = TR::Node::lconst(indexNode, elementSize);
 
          offsetOpCode = useShiftOpCode ? TR::lshl : TR::lmul;
          }
       else
          {
-         if (newElementSizeNode == NULL && elementSize > 1)
-            newElementSizeNode = TR::Node::iconst(indexNode, elementSize);
+         if (strideNode == NULL && elementSize > 1)
+            strideNode = TR::Node::iconst(indexNode, elementSize);
 
          offsetOpCode = useShiftOpCode ? TR::ishl : TR::imul;
          }
 
-      offsetNode = TR::Node::create(offsetOpCode, 2, offsetNode, newElementSizeNode);
+      offsetNode = TR::Node::create(offsetOpCode, 2, offsetNode, strideNode);
       }
 
    return offsetNode;
