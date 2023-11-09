@@ -174,32 +174,30 @@ TR::Node *
 J9::TransformUtil::generateArrayOffsetTrees(TR::Compilation *comp, TR::Node *indexNode, TR::Node *strideNode, int32_t elementSize, bool useShiftOpCode)
    {
    TR::Node *offsetNode = indexNode->createLongIfNeeded();
+   if (strideNode)
+      strideNode = strideNode->createLongIfNeeded();
    // TODO_sverma: Need to investigate why using convertStoreDirectToLoadWithI2LIfNeeded
    //              results in null pointer exceptions.
    // TR::Node *offsetNode = indexNode->convertStoreDirectToLoadWithI2LIfNeeded();
 
    if (strideNode != NULL || elementSize > 1)
       {
-      TR::Node *newStrideNode = NULL;
-      if (strideNode)
-         newStrideNode = strideNode->convertStoreDirectToLoadWithI2LIfNeeded();
-
       TR::ILOpCodes offsetOpCode = TR::BadILOp;
       if (comp->target().is64Bit())
          {
-         if (newStrideNode == NULL && elementSize > 1)
-            newStrideNode = TR::Node::lconst(indexNode, elementSize);
+         if (strideNode == NULL && elementSize > 1)
+            strideNode = TR::Node::lconst(indexNode, elementSize);
 
          offsetOpCode = useShiftOpCode ? TR::lshl : TR::lmul;
          }
       else
          {
-         if (newStrideNode == NULL && elementSize > 1)
-            newStrideNode = TR::Node::iconst(indexNode, elementSize);
+         if (strideNode == NULL && elementSize > 1)
+            strideNode = TR::Node::iconst(indexNode, elementSize);
 
          offsetOpCode = useShiftOpCode ? TR::ishl : TR::imul;
          }
-      offsetNode = TR::Node::create(offsetOpCode, 2, offsetNode, newStrideNode);
+      offsetNode = TR::Node::create(offsetOpCode, 2, offsetNode, strideNode);
       }
 
    return offsetNode;
