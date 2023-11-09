@@ -892,14 +892,15 @@ createArrayAddressTree(TR::Compilation *comp, bool is64bit, TR::Node *baseNode, 
    {
    TR::Node *top = NULL;
    TR::Node *c2 = NULL;
+   TR::Node *aload = createLoad(baseNode);
    if (indexNode->getOpCodeValue() == TR::iconst && indexNode->getInt() == 0)
       {
-      top = TR::TransformUtil::generateFirstArrayElementAddressTrees(comp, baseNode);
+      top = TR::TransformUtil::generateFirstArrayElementAddressTrees(comp, aload);
       }
    else
       {
-      c2 = TR::TransformUtil::generateConvertArrayElementIndexToOffsetTrees(comp, indexNode, NULL, multiply);
-      top = TR::TransformUtil::generateArrayElementAddressTrees(comp, baseNode, c2);
+      c2 = TR::TransformUtil::generateConvertArrayElementIndexToOffsetTrees(comp, indexNode, NULL, multiply, false);
+      top = TR::TransformUtil::generateArrayElementAddressTrees(comp, aload, c2);
       }
 
    return top;
