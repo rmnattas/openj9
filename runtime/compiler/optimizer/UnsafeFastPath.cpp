@@ -371,20 +371,8 @@ int32_t TR_UnsafeFastPath::perform()
             charArray->setIsNonNull(true);
 
             prepareToReplaceNode(node); // This will remove the usedef info, valueNumber info and all children of the node
-            TR::Node *addrCalc;
-            if (comp()->target().is64Bit())
-               {
-               addrCalc = TR::Node::create(TR::aladd, 2, charArray,
-                     TR::Node::create(TR::ladd, 2, TR::Node::create(TR::lmul, 2, TR::Node::create(TR::i2l, 1, index), TR::Node::lconst(index, 4)),
-                                       TR::Node::lconst(index, TR::Compiler->om.contiguousArrayHeaderSizeInBytes())));
-               }
-            else
-               {
-               addrCalc = TR::Node::create(TR::aiadd, 2, charArray,
-                     TR::Node::create(TR::iadd, 2, TR::Node::create(TR::imul, 2, index, TR::Node::iconst(index, 4)),
-                                       TR::Node::iconst(index, TR::Compiler->om.contiguousArrayHeaderSizeInBytes())));
-               }
-
+            TR::Node *offsetNode = TR::TransformUtil::generateArrayOffsetTrees(comp(), index, NULL, 4, false);
+            TR::Node *addrCalc = TR::TransformUtil::generateArrayAddressTrees(comp(), charArray, offsetNode);
             TR::SymbolReference * unsafeSymRef = comp()->getSymRefTab()->findOrCreateUnsafeSymbolRef(TR::Int32, true, false);
             node = TR::Node::recreateWithoutProperties(node, TR::istorei, 2, addrCalc, value, unsafeSymRef);
 
@@ -726,7 +714,7 @@ int32_t TR_UnsafeFastPath::perform()
          // Skip inlining of helpers for arraylets if unsafe for arraylets is disabled
          static char * disableUnsafeForArraylets = feGetEnv("TR_DisableUnsafeForArraylets");
 
-         if (mightBeArraylets && disableUnsafeForArraylets && TR::Compiler->om.isOffHeapAllocationEnabled())
+         if (mightBeArraylets && disableUnsafeForArraylets)
             {
             if (trace())
                traceMsg(comp(), "unsafeForArraylets is disabled, skip unsafeFastPath for node [" POINTER_PRINTF_FORMAT "]\n", node);
@@ -911,12 +899,24 @@ int32_t TR_UnsafeFastPath::perform()
             else
                {
                TR::Node *addrCalc = NULL;
-
                // Calculate element address
+#if defined(TR_TARGET_64BIT)
+               if (isArrayOperation && TR::Compiler->om.isOffHeapAllocationEnabled())
+                  {
+                  TR::Node *baseNodeForAdd = TR::TransformUtil::generateDataAddrLoadTrees(comp(), base);
+                  TR::Node *newOffset = TR::Node::create(TR::ladd, 2, offset, TR::Node::lconst(-TR::Compiler->om.contiguousArrayHeaderSizeInBytes()));
+
+                  addrCalc = TR::Node::create(TR::aladd, 2, baseNodeForAdd, newOffset);
+                  }
+               else if (comp()->target().is64Bit())
+#else
                if (comp()->target().is64Bit())
+#endif /* TR_TARGET_64BIT */
                   addrCalc = TR::Node::create(TR::aladd, 2, base, offset);
                else
                   addrCalc = TR::Node::create(TR::aiadd, 2, base, TR::Node::create(TR::l2i, 1, offset));
+
+               addrCalc->setIsInternalPointer(true);
 
                if (value)
                   {
