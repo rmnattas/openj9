@@ -9615,8 +9615,7 @@ static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGe
    TR::Compilation *comp = cg->comp();
    TR_J9VMBase *fej9 = comp->fej9();
 
-   // TODO: create codegen api like arrayCopy?
-   TR_ASSERT_FATAL((!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled()) || node->isUnsafeGetPutCASCallOnNonArray(), "This evaluator does not support arraylets and off heap.");
+   TR_ASSERT_FATAL(!TR::Compiler->om.canGenerateArraylets() || node->isUnsafeGetPutCASCallOnNonArray(), "This evaluator does not support arraylets.");
 
    cg->recursivelyDecReferenceCount(node->getChild(0)); // The Unsafe
    TR::Node* objectNode   = node->getChild(1);
