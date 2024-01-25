@@ -65,7 +65,7 @@ GC_ArrayletObjectModel::AssertArrayletIsDiscontiguous(J9IndexableObject *objPtr)
 				MM_GCExtensionsBase *extensions = MM_GCExtensionsBase::getExtensions(_omrVM);
 				Assert_MM_true((getSpineSize(objPtr) + remainderBytes + extensions->getObjectAlignmentInBytes()) > arrayletLeafSize);
 			}
-		} else {
+		} else if (0 != getSizeInElements(objPtr)) {
 			Assert_MM_unreachable();
 		}
 	}
