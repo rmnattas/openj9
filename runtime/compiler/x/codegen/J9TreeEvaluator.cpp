@@ -9613,9 +9613,8 @@ static TR::Register* inlineIntrinsicIndexOf(TR::Node* node, TR::CodeGenerator* c
 static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGenerator* cg)
    {
    TR::Compilation *comp = cg->comp();
-   TR_J9VMBase *fej9 = comp->fej9();
 
-   TR_ASSERT_FATAL(!TR::Compiler->om.canGenerateArraylets() || node->isUnsafeGetPutCASCallOnNonArray(), "This evaluator does not support arraylets.");
+   TR_ASSERT(!TR::Compiler->om.canGenerateArraylets() || node->isUnsafeGetPutCASCallOnNonArray(), "This evaluator does not support arraylets.");
 
    cg->recursivelyDecReferenceCount(node->getChild(0)); // The Unsafe
    TR::Node* objectNode   = node->getChild(1);
@@ -9623,23 +9622,15 @@ static TR::Register* inlineCompareAndSwapObjectNative(TR::Node* node, TR::CodeGe
    TR::Node* oldValueNode = node->getChild(3);
    TR::Node* newValueNode = node->getChild(4);
 
-   TR::Register* object           = cg->evaluate(objectNode);
-   // evaluation of offset is determined by if we are dealing with an array operation or not
-   TR::Register* offset           = NULL;
-   TR::Register* oldValue         = cg->evaluate(oldValueNode);
-   TR::Register* newValue         = cg->evaluate(newValueNode);
-   TR::Register* result           = cg->allocateRegister();
-   TR::Register* EAX              = cg->allocateRegister();
-   TR::Register* tmp              = cg->allocateRegister();
-   TR::Register* firstDataElement = NULL;
+   TR::Register* object   = cg->evaluate(objectNode);
+   TR::Register* offset   = cg->evaluate(offsetNode);
+   TR::Register* oldValue = cg->evaluate(oldValueNode);
+   TR::Register* newValue = cg->evaluate(newValueNode);
+   TR::Register* result   = cg->allocateRegister();
+   TR::Register* EAX      = cg->allocateRegister();
+   TR::Register* tmp      = cg->allocateRegister();
 
    bool use64BitClasses = comp->target().is64Bit() && !comp->useCompressedPointers();
-
-   TR::MemoryReference *objectFieldMR = NULL;
-      {
-      offset = cg->evaluate(offsetNode);
-      objectFieldMR = generateX86MemoryReference(object, offset, 0, cg);
-      }
 
    if (comp->target().is32Bit())
       {
