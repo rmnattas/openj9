@@ -11792,15 +11792,13 @@ J9::Power::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&result
          break;
 
       case TR::sun_misc_Unsafe_compareAndSwapInt_jlObjectJII_Z:
-         // In Java9 this can be either the jdk.internal JNI method or the sun.misc Java wrapper.
-         // In Java8 it will be sun.misc which will contain the JNI directly.
-         // We only want to inline the JNI methods, so add an explicit test for isNative().
-         if (!methodSymbol->isNative())
-            break;
+        // In Java9 this can be either the jdk.internal JNI method or the sun.misc Java wrapper.
+        // In Java8 it will be sun.misc which will contain the JNI directly.
+        // We only want to inline the JNI methods, so add an explicit test for isNative().
+        if (!methodSymbol->isNative())
+           break;
 
-         // When dealing with array object; don't inline if arraylets or off heap is enabled
-         if (node->isSafeForCGToFastPathUnsafeCall()
-            && (node->isUnsafeGetPutCASCallOnNonArray() || (!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled())))
+        if ((node->isUnsafeGetPutCASCallOnNonArray() || !TR::Compiler->om.canGenerateArraylets()) && node->isSafeForCGToFastPathUnsafeCall())
             {
             resultReg = VMinlineCompareAndSwap(node, cg, false);
             return true;
@@ -11814,11 +11812,14 @@ J9::Power::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&result
          if (!methodSymbol->isNative())
             break;
 
-         // When dealing with array object; don't inline if arraylets or off heap is enabled
-         if (node->isSafeForCGToFastPathUnsafeCall()
-            && (node->isUnsafeGetPutCASCallOnNonArray() || (!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled())))
+         if (comp->target().is64Bit() && (node->isUnsafeGetPutCASCallOnNonArray() || !TR::Compiler->om.canGenerateArraylets()) && node->isSafeForCGToFastPathUnsafeCall())
             {
-            resultReg = comp->target().is64Bit() ? VMinlineCompareAndSwap(node, cg, true) : inlineAtomicOperation(node, cg, methodSymbol);
+            resultReg = VMinlineCompareAndSwap(node, cg, true);
+            return true;
+            }
+         else if ((node->isUnsafeGetPutCASCallOnNonArray() || !TR::Compiler->om.canGenerateArraylets()) && node->isSafeForCGToFastPathUnsafeCall())
+            {
+            resultReg = inlineAtomicOperation(node, cg, methodSymbol);
             return true;
             }
          break;
@@ -11828,9 +11829,7 @@ J9::Power::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&result
          if (!methodSymbol->isNative())
             break;
 
-         // When dealing with array object; don't inline if arraylets or off heap is enabled
-         if (node->isSafeForCGToFastPathUnsafeCall()
-            && (node->isUnsafeGetPutCASCallOnNonArray() || (!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled())))
+         if ((node->isUnsafeGetPutCASCallOnNonArray() || !TR::Compiler->om.canGenerateArraylets()) && node->isSafeForCGToFastPathUnsafeCall())
             {
             resultReg = VMinlineCompareAndSwapObject(node, cg);
             return true;

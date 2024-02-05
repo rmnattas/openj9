@@ -9761,7 +9761,7 @@ inlineCompareAndSwapNative(
 
    TR::InstOpCode::Mnemonic op;
 
-   if ((TR::Compiler->om.canGenerateArraylets() || TR::Compiler->om.isOffHeapAllocationEnabled()) && !node->isUnsafeGetPutCASCallOnNonArray())
+   if (TR::Compiler->om.canGenerateArraylets() && !node->isUnsafeGetPutCASCallOnNonArray())
       return false;
 
    static char *disableCASInlining = feGetEnv("TR_DisableCASInlining");
@@ -9827,18 +9827,6 @@ inlineCompareAndSwapNative(
    cg->decReferenceCount(offsetChild);
 
    TR::MemoryReference *mr;
-
-   /* TODO: Check if off heap is enabled
-    * If Off heap is enabled:
-    *    check if object is of type array
-    *      For reference: VMHelpers::objectIsArray(J9VMThread *currentThread, j9object_t object)
-    *      For reference: aarch64/J9TreeEvaluator::genInstanceOfOrCheckCastObjectArrayTest(...)
-    *    Array object:
-    *       load dataAddr field into a reg
-    *       subtract arrayheader size from offsetReg
-    *    else:
-    *       leave everything as it is
-    */
 
    if (offsetReg)
       mr = generateX86MemoryReference(objectReg, offsetReg, 0, cg);
@@ -10131,7 +10119,6 @@ bool J9::X86::TreeEvaluator::VMinlineCallEvaluator(
             break;
          case TR::sun_misc_Unsafe_compareAndSwapObject_jlObjectJjlObjectjlObject_Z:
             {
-            // TODO_sverma: where do we guard against arraylets because we defintely don't do it here or in the evaluators
             static bool UseOldCompareAndSwapObject = (bool)feGetEnv("TR_UseOldCompareAndSwapObject");
             if(node->isSafeForCGToFastPathUnsafeCall())
                {
