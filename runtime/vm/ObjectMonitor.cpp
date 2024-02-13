@@ -430,6 +430,13 @@ restart:
 				if (lock == OBJECT_HEADER_LOCK_RESERVED) {
 					/* Object in New-AutoReserve was locked so the Reserved Counter in the object's J9Class is incremented by 1. */
 					VM_ObjectMonitor::incrementReservedCounter(J9OBJECT_CLAZZ(currentThread, object));
+				} else if (lock == OBJECT_HEADER_LOCK_LEARNING) {
+					/* Object in New-PreLearning was locked so the Reserved Counter in the object's J9Class is occationally incremented by 1. */
+					static volatile UDATA randCounter = 0;
+					randCounter = (randCounter + 1) & 0x1FFF;
+					if (0x1FFF == randCounter) {
+						VM_ObjectMonitor::incrementReservedCounter(J9OBJECT_CLAZZ(currentThread, object));
+					}
 				}
 			} else {
 				J9ObjectMonitor *objectMonitor = NULL;
