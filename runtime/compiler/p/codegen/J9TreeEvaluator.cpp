@@ -7709,6 +7709,85 @@ TR::Register *J9::Power::TreeEvaluator::VMmonentEvaluator(TR::Node *node, TR::Co
       incrementCheckLabel = generateLabelSymbol(cg);
       doneLabel = generateLabelSymbol(cg);
 
+//---------------------------------------
+      TR_OpaqueClassBlock *classPointer = (TR_OpaqueClassBlock *) cg->getMonClass(node);
+      int32_t len;
+      const char *className = classPointer ? fej9->getClassNameChars(classPointer, len) : "unknown";
+
+      TR::LabelSymbol *sameCheckLabel, *diffCheckLabel, *diffLearnLabel, *diffFlatLabel, *diffDoneLabel;
+      TR::LabelSymbol *sameLearnLabel, *sameFlatLabel;
+      TR::LabelSymbol *skipNewLearning, *skipAutoReserve;
+
+      sameCheckLabel = generateLabelSymbol(cg);
+      diffCheckLabel = generateLabelSymbol(cg);
+      diffLearnLabel = generateLabelSymbol(cg);
+      diffFlatLabel = generateLabelSymbol(cg);
+      diffDoneLabel = generateLabelSymbol(cg);
+      sameLearnLabel = generateLabelSymbol(cg);
+      sameFlatLabel = generateLabelSymbol(cg);
+      skipNewLearning = generateLabelSymbol(cg);
+      skipAutoReserve = generateLabelSymbol(cg);
+
+      generateTrg1MemInstruction(cg, loadOpCode, node, monitorReg, TR::MemoryReference::createWithDisplacement(cg, baseReg, lwOffset, lockSize));
+      generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::andi_r, node, tempReg, monitorReg, OBJECT_HEADER_LOCK_INFLATED);
+      generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, diffDoneLabel, condReg);
+
+      generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::Op_cmpli, node, condReg, monitorReg, OBJECT_HEADER_LOCK_RESERVED);
+      generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, skipAutoReserve, condReg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresUnowned/autoReserve", className), 1, TR::DebugCounter::Cheap);
+      generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+      generateLabelInstruction(cg, TR::InstOpCode::label, node, skipAutoReserve);
+      generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::Op_cmpli, node, condReg, monitorReg, OBJECT_HEADER_LOCK_LEARNING);
+      generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, skipNewLearning, condReg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresUnowned/newLearning", className), 1, TR::DebugCounter::Cheap);
+      generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+      generateLabelInstruction(cg, TR::InstOpCode::label, node, skipNewLearning);
+      generateTrg1ImmInstruction(cg, TR::InstOpCode::li, node, tempReg, OBJECT_HEADER_LOCK_BITS_MASK);
+      generateTrg1Src2Instruction(cg, TR::InstOpCode::andc, node, tempReg, monitorReg, tempReg);
+
+      generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::Op_cmpli, node, condReg, tempReg, 0);
+      generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, sameCheckLabel, condReg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresUnowned/Flat", className), 1, TR::DebugCounter::Cheap);
+      generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+      generateLabelInstruction(cg, TR::InstOpCode::label, node, sameCheckLabel);
+      generateTrg1Src2Instruction(cg, TR::InstOpCode::Op_cmpl, node, condReg, tempReg, metaReg);
+      generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, diffCheckLabel, condReg);
+      generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::andi_r, node, tempReg, monitorReg, OBJECT_HEADER_LOCK_RESERVED);
+      generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, sameLearnLabel, condReg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresSameReserved", className), 1, TR::DebugCounter::Cheap);
+      generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+      generateLabelInstruction(cg, TR::InstOpCode::label, node, sameLearnLabel);
+      generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::andi_r, node, tempReg, monitorReg, OBJECT_HEADER_LOCK_LEARNING);
+      generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, sameFlatLabel, condReg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresSameLearning", className), 1, TR::DebugCounter::Cheap);
+      generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+      generateLabelInstruction(cg, TR::InstOpCode::label, node, sameFlatLabel);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresSameFlat", className), 1, TR::DebugCounter::Cheap);
+      generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+      generateLabelInstruction(cg, TR::InstOpCode::label, node, diffCheckLabel);
+      generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::andi_r, node, tempReg, monitorReg, OBJECT_HEADER_LOCK_RESERVED);
+      generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, diffLearnLabel, condReg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresDiffReserved", className), 1, TR::DebugCounter::Cheap);
+      generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+      generateLabelInstruction(cg, TR::InstOpCode::label, node, diffLearnLabel);
+      generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::andi_r, node, tempReg, monitorReg, OBJECT_HEADER_LOCK_LEARNING);
+      generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, diffFlatLabel, condReg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresDiffLearning", className), 1, TR::DebugCounter::Cheap);
+      generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+      generateLabelInstruction(cg, TR::InstOpCode::label, node, diffFlatLabel);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresDiffFlat", className), 1, TR::DebugCounter::Cheap);
+
+      generateLabelInstruction(cg, TR::InstOpCode::label, node, diffDoneLabel);
+//---------------------------------------
+
       generateTrg1MemInstruction(cg, loadOpCode, node, monitorReg, TR::MemoryReference::createWithDisplacement(cg, baseReg, lwOffset, lockSize));
 
       generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, monitorReg, 0);
