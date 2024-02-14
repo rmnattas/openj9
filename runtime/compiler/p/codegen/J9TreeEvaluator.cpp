@@ -82,6 +82,7 @@
 
 #define LOCK_INC_DEC_VALUE                                OBJECT_HEADER_LOCK_FIRST_RECURSION_BIT
 #define LOCK_RESERVATION_BIT                              OBJECT_HEADER_LOCK_RESERVED
+#define LOCK_LRN_RES_BITS                                 (OBJECT_HEADER_LOCK_LEARNING | OBJECT_HEADER_LOCK_RESERVED)
 
 #define LOCK_RES_PRIMITIVE_ENTER_MASK                     (OBJECT_HEADER_LOCK_RECURSION_MASK | OBJECT_HEADER_LOCK_FLC)
 #define LOCK_RES_PRIMITIVE_EXIT_MASK                      (OBJECT_HEADER_LOCK_BITS_MASK & ~OBJECT_HEADER_LOCK_RECURSION_MASK)
@@ -7464,6 +7465,18 @@ TR::Register *J9::Power::TreeEvaluator::VMmonentEvaluator(TR::Node *node, TR::Co
       return targetRegister;
       }
 
+   TR::SimpleRegex *glrBlocklistRegex = comp->getOptions()->getGLRBlocklist();
+   TR_OpaqueClassBlock *classPointer = (TR_OpaqueClassBlock *) cg->getMonClass(node);
+   const char *className = classPointer ? TR::Compiler->cls.classSignature(comp, classPointer, cg->trMemory()) : "unknown";
+   bool blockGLR = false;
+   if ((glrBlocklistRegex != NULL) && (classPointer != NULL))
+      {
+      if (TR::SimpleRegex::match(glrBlocklistRegex, className))
+         {
+         blockGLR = true;
+         }
+      }
+
    int32_t numDeps = 6;
 
    TR::Node *objNode = node->getFirstChild();
@@ -7709,15 +7722,111 @@ TR::Register *J9::Power::TreeEvaluator::VMmonentEvaluator(TR::Node *node, TR::Co
       incrementCheckLabel = generateLabelSymbol(cg);
       doneLabel = generateLabelSymbol(cg);
 
+//---------------------------------------
+      const char *enableCounters = TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluatorEnable", className);
+
+      if (enableCounters && comp->getOptions()->dynamicDebugCounterIsEnabled(enableCounters))
+         {
+         TR::LabelSymbol *sameCheckLabel, *diffCheckLabel, *diffLearnLabel, *diffFlatLabel, *diffDoneLabel;
+         TR::LabelSymbol *sameLearnLabel, *sameFlatLabel;
+         TR::LabelSymbol *skipNewLearning, *skipAutoReserve;
+
+         sameCheckLabel = generateLabelSymbol(cg);
+         diffCheckLabel = generateLabelSymbol(cg);
+         diffLearnLabel = generateLabelSymbol(cg);
+         diffFlatLabel = generateLabelSymbol(cg);
+         diffDoneLabel = generateLabelSymbol(cg);
+         sameLearnLabel = generateLabelSymbol(cg);
+         sameFlatLabel = generateLabelSymbol(cg);
+         skipNewLearning = generateLabelSymbol(cg);
+         skipAutoReserve = generateLabelSymbol(cg);
+
+         generateTrg1MemInstruction(cg, loadOpCode, node, monitorReg, TR::MemoryReference::createWithDisplacement(cg, baseReg, lwOffset, lockSize));
+         generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::andi_r, node, tempReg, monitorReg, OBJECT_HEADER_LOCK_INFLATED);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, diffDoneLabel, condReg);
+
+         generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::Op_cmpli, node, condReg, monitorReg, OBJECT_HEADER_LOCK_RESERVED);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, skipAutoReserve, condReg);
+         cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresUnowned/autoReserve", className), 1, TR::DebugCounter::Cheap);
+         generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+         generateLabelInstruction(cg, TR::InstOpCode::label, node, skipAutoReserve);
+         generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::Op_cmpli, node, condReg, monitorReg, OBJECT_HEADER_LOCK_LEARNING);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, skipNewLearning, condReg);
+         cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresUnowned/newLearning", className), 1, TR::DebugCounter::Cheap);
+         generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+         generateLabelInstruction(cg, TR::InstOpCode::label, node, skipNewLearning);
+         generateTrg1ImmInstruction(cg, TR::InstOpCode::li, node, tempReg, OBJECT_HEADER_LOCK_BITS_MASK);
+         generateTrg1Src2Instruction(cg, TR::InstOpCode::andc, node, tempReg, monitorReg, tempReg);
+
+         generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::Op_cmpli, node, condReg, tempReg, 0);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, sameCheckLabel, condReg);
+         cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresUnowned/Flat", className), 1, TR::DebugCounter::Cheap);
+         generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+         generateLabelInstruction(cg, TR::InstOpCode::label, node, sameCheckLabel);
+         generateTrg1Src2Instruction(cg, TR::InstOpCode::Op_cmpl, node, condReg, tempReg, metaReg);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, diffCheckLabel, condReg);
+         generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::andi_r, node, tempReg, monitorReg, OBJECT_HEADER_LOCK_RESERVED);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, sameLearnLabel, condReg);
+         cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresSameReserved", className), 1, TR::DebugCounter::Cheap);
+         generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+         generateLabelInstruction(cg, TR::InstOpCode::label, node, sameLearnLabel);
+         generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::andi_r, node, tempReg, monitorReg, OBJECT_HEADER_LOCK_LEARNING);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, sameFlatLabel, condReg);
+         cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresSameLearning", className), 1, TR::DebugCounter::Cheap);
+         generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+         generateLabelInstruction(cg, TR::InstOpCode::label, node, sameFlatLabel);
+         cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresSameFlat", className), 1, TR::DebugCounter::Cheap);
+         generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+         generateLabelInstruction(cg, TR::InstOpCode::label, node, diffCheckLabel);
+         generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::andi_r, node, tempReg, monitorReg, OBJECT_HEADER_LOCK_RESERVED);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, diffLearnLabel, condReg);
+         cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresDiffReserved", className), 1, TR::DebugCounter::Cheap);
+         generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+         generateLabelInstruction(cg, TR::InstOpCode::label, node, diffLearnLabel);
+         generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::andi_r, node, tempReg, monitorReg, OBJECT_HEADER_LOCK_LEARNING);
+         generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, diffFlatLabel, condReg);
+         cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresDiffLearning", className), 1, TR::DebugCounter::Cheap);
+         generateLabelInstruction(cg, TR::InstOpCode::b, node, diffDoneLabel);
+
+         generateLabelInstruction(cg, TR::InstOpCode::label, node, diffFlatLabel);
+         cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "VMmonentEvaluator/(%s)/glresDiffFlat", className), 1, TR::DebugCounter::Cheap);
+
+         generateLabelInstruction(cg, TR::InstOpCode::label, node, diffDoneLabel);
+         }
+//---------------------------------------
+
       generateTrg1MemInstruction(cg, loadOpCode, node, monitorReg, TR::MemoryReference::createWithDisplacement(cg, baseReg, lwOffset, lockSize));
 
-      generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, monitorReg, 0);
+      if (blockGLR)
+         {
+         generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::ori, node, tempReg, monitorReg, LOCK_LRN_RES_BITS);
+         generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, tempReg, LOCK_LRN_RES_BITS);
+         }
+      else
+         {
+         generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, monitorReg, 0);
+         }
       generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, incrementCheckLabel, condReg);
       generateTrg1ImmInstruction(cg, TR::InstOpCode::li, node, offsetReg, lwOffset);
 
       generateLabelInstruction(cg, TR::InstOpCode::label, node, loopLabel);
       generateTrg1MemInstruction(cg, reservedLoadOpCode, PPCOpProp_LoadReserveExclusiveAccess, node, monitorReg, TR::MemoryReference::createWithIndexReg(cg, baseReg, offsetReg, lockSize));
-      generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, monitorReg, 0);
+      if (blockGLR)
+         {
+         generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::ori, node, tempReg, monitorReg, LOCK_LRN_RES_BITS);
+         generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, tempReg, LOCK_LRN_RES_BITS);
+         }
+      else
+         {
+         generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, monitorReg, 0);
+         }
       generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, callLabel, condReg);
       generateMemSrc1Instruction(cg, conditionalStoreOpCode, node, TR::MemoryReference::createWithIndexReg(cg, baseReg, offsetReg, lockSize), metaReg);
 
