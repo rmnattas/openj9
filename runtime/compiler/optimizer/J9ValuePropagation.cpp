@@ -494,7 +494,8 @@ bool J9::ValuePropagation::transformUnsafeCopyMemoryCall(TR::Node *arraycopyNode
    if (!canRunTransformToArrayCopy())
       return false;
 
-   if (comp()->canTransformUnsafeCopyToArrayCopy()
+   if (!comp()->getOption(TR_DisableUnsafe)
+         && comp()->canTransformUnsafeCopyToArrayCopy()
          && arraycopyNode->isUnsafeCopyMemoryIntrinsic())
       {
 
