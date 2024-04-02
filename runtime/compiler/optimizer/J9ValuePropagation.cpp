@@ -524,7 +524,18 @@ bool J9::ValuePropagation::transformUnsafeCopyMemoryCall(TR::Node *arraycopyNode
          int64_t copyLenLow  = copyLenConstraint   ? copyLenConstraint->getLowInt() : TR::getMinSigned<TR::Int32>();
          int64_t copyLenHigh = copyLenConstraint   ? copyLenConstraint->getHighInt() : TR::getMaxSigned<TR::Int32>();
 
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+         if (TR::Compiler->om.isOffHeapAllocationEnabled())
+            {
+            src = TR::TransformUtil::generateDataAddrLoadTrees(comp(), src);
+            src = TR::Node::create(TR::aladd, 2, src, srcOffset);
+            dest = TR::TransformUtil::generateDataAddrLoadTrees(comp(), dest);
+            dest = TR::Node::create(TR::aladd, 2, dest, destOffset);
+            }
+         else if (comp()->target().is64Bit())
+#else
          if (comp()->target().is64Bit())
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
             {
             src  = TR::Node::create(TR::aladd, 2, src, srcOffset);
             dest = TR::Node::create(TR::aladd, 2, dest, destOffset);

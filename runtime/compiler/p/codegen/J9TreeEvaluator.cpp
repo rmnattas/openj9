@@ -11646,7 +11646,16 @@ J9::Power::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&result
             TR::Node *destOffset = node->getChild(2);
             TR::Node *len = node->getChild(3);
             TR::Node *byteValue = node->getChild(4);
-            dest = TR::Node::create(TR::aladd, 2, dest, destOffset);
+
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+            if (TR::Compiler->om.isOffHeapAllocationEnabled())
+               {
+               dest = TR::TransformUtil::generateDataAddrLoadTrees(comp(), dest);
+               dest = TR::Node::create(TR::aladd, 2, dest, destOffset);
+               }
+            else
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
+               dest = TR::Node::create(TR::aladd, 2, dest, destOffset);
 
             TR::Node * copyMemNode = TR::Node::createWithSymRef(TR::arrayset, 3, 3, dest, len, byteValue, node->getSymbolReference());
             copyMemNode->setByteCodeInfo(node->getByteCodeInfo());

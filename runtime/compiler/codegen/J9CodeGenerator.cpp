@@ -861,7 +861,18 @@ J9::CodeGenerator::lowerTreeIfNeeded(
          TR::Node *destOffset = node->getChild(4);
          TR::Node *len = node->getChild(5);
 
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+         if (TR::Compiler->om.isOffHeapAllocationEnabled())
+            {
+            src = TR::TransformUtil::generateDataAddrLoadTrees(comp(), src);
+            src = TR::Node::create(TR::aladd, 2, src, srcOffset);
+            dest = TR::TransformUtil::generateDataAddrLoadTrees(comp(), dest);
+            dest = TR::Node::create(TR::aladd, 2, dest, destOffset);
+            }
+         else if (self()->comp()->target().is32Bit())
+#else
          if (self()->comp()->target().is32Bit())
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
             {
             srcOffset = TR::Node::create(TR::l2i, 1, srcOffset);
             destOffset = TR::Node::create(TR::l2i, 1, destOffset);
