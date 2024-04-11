@@ -126,8 +126,8 @@ referenceArrayCopy(J9VMThread *vmThread, J9IndexableObject *srcObject, J9Indexab
 		uintptr_t const referenceSize = J9VMTHREAD_REFERENCE_SIZE(vmThread);
 		uintptr_t srcDataAddr = (uintptr_t) barrier->getArrayObjectDataAddress(vmThread, srcObject);
 		uintptr_t dstDataAddr = (uintptr_t) barrier->getArrayObjectDataAddress(vmThread, destObject);
-		I_32 srcIndex = (I_32)(((uintptr_t)srcAddress - srcDataAddr) / referenceSize);
-		I_32 destIndex = (I_32)(((uintptr_t)destAddress - dstDataAddr) / referenceSize);
+		int32_t srcIndex = (int32_t)(((uintptr_t)srcAddress - srcDataAddr) / referenceSize);
+		int32_t destIndex = (int32_t)(((uintptr_t)destAddress - dstDataAddr) / referenceSize);
 
 		return referenceArrayCopyIndex(vmThread, srcObject, destObject, srcIndex, destIndex, lengthInSlots);
 	}
