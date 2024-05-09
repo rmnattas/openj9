@@ -11427,15 +11427,34 @@ static bool inlineIntrinsicInflate(TR::Node *node, TR::CodeGenerator *cg)
    generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::cmpi4, node, condReg, remainingReg, 0);
    generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, doneLabel, condReg);
 
-   /* Add array header size and offset to the start of the array to determine the address of the first byte to read. */
-   generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::addi, node, inputAddressReg, inputAddressReg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+   /*
+    * Determine the address of the first byte to read either by loading from dataAddr or adding the header size.
+    * This is followed by adding in the offset.
+    */
+#if defined(TR_TARGET_64BIT)
+   if (TR::Compiler->om.isIndexableDataAddrPresent())
+      {
+      generateTrg1MemInstruction(cg, TR::InstOpCode::ld, node, inputAddressReg, TR::MemoryReference::createWithDisplacement(cg, inputAddressReg, TR::Compiler->om.offsetOfContiguousDataAddrField(), 8));
+      }
+   else
+#endif /* TR_TARGET_64BIT */
+      generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::addi, node, inputAddressReg, inputAddressReg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+
    generateTrg1Src2Instruction(cg, TR::InstOpCode::add, node, inputAddressReg, inputAddressReg, inputOffsetReg);
 
    /*
-    * Add array header size and twice the offset to the start of the array to determine the address of the first char to store.
-    * Offset is doubled due to being char data.
+    * Determine the address of the first char to store either by loading from dataAddr or adding the header size.
+    * This is followed by adding in the offset twice due to being char data.
     */
-   generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::addi, node, outputAddressReg, outputAddressReg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+#if defined(TR_TARGET_64BIT)
+   if (TR::Compiler->om.isIndexableDataAddrPresent())
+      {
+      generateTrg1MemInstruction(cg, TR::InstOpCode::ld, node, outputAddressReg, TR::MemoryReference::createWithDisplacement(cg, outputAddressReg, TR::Compiler->om.offsetOfContiguousDataAddrField(), 8));
+      }
+   else
+#endif /* TR_TARGET_64BIT */
+      generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::addi, node, outputAddressReg, outputAddressReg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+
    generateShiftLeftImmediate(cg, node, outputOffsetReg, outputOffsetReg, 1);
    generateTrg1Src2Instruction(cg, TR::InstOpCode::add, node, outputAddressReg, outputAddressReg, outputOffsetReg);
 
