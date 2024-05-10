@@ -11431,14 +11431,16 @@ static bool inlineIntrinsicInflate(TR::Node *node, TR::CodeGenerator *cg)
     * Determine the address of the first byte to read either by loading from dataAddr or adding the header size.
     * This is followed by adding in the offset.
     */
-#if defined(TR_TARGET_64BIT)
-   if (TR::Compiler->om.isIndexableDataAddrPresent())
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+   if (TR::Compiler->om.isOffHeapAllocationEnabled())
       {
       generateTrg1MemInstruction(cg, TR::InstOpCode::ld, node, inputAddressReg, TR::MemoryReference::createWithDisplacement(cg, inputAddressReg, TR::Compiler->om.offsetOfContiguousDataAddrField(), 8));
       }
    else
-#endif /* TR_TARGET_64BIT */
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
+      {
       generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::addi, node, inputAddressReg, inputAddressReg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+      }
 
    generateTrg1Src2Instruction(cg, TR::InstOpCode::add, node, inputAddressReg, inputAddressReg, inputOffsetReg);
 
@@ -11446,14 +11448,16 @@ static bool inlineIntrinsicInflate(TR::Node *node, TR::CodeGenerator *cg)
     * Determine the address of the first char to store either by loading from dataAddr or adding the header size.
     * This is followed by adding in the offset twice due to being char data.
     */
-#if defined(TR_TARGET_64BIT)
-   if (TR::Compiler->om.isIndexableDataAddrPresent())
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+   if (TR::Compiler->om.isOffHeapAllocationEnabled())
       {
       generateTrg1MemInstruction(cg, TR::InstOpCode::ld, node, outputAddressReg, TR::MemoryReference::createWithDisplacement(cg, outputAddressReg, TR::Compiler->om.offsetOfContiguousDataAddrField(), 8));
       }
    else
-#endif /* TR_TARGET_64BIT */
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
+      {
       generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::addi, node, outputAddressReg, outputAddressReg, TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+      }
 
    generateShiftLeftImmediate(cg, node, outputOffsetReg, outputOffsetReg, 1);
    generateTrg1Src2Instruction(cg, TR::InstOpCode::add, node, outputAddressReg, outputAddressReg, outputOffsetReg);
