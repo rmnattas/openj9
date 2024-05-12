@@ -874,7 +874,7 @@ J9::CodeGenerator::lowerTreeIfNeeded(
 
       if ((rm == TR::sun_misc_Unsafe_copyMemory || rm == TR::jdk_internal_misc_Unsafe_copyMemory0) &&
             performTransformation(self()->comp(), "O^O Call arraycopy instead of Unsafe.copyMemory: %s\n", self()->getDebug()->getName(node)))
-         {
+         { 
          TR::Node *src = node->getChild(1);
          TR::Node *srcOffset = node->getChild(2);
          TR::Node *dest = node->getChild(3);
@@ -891,6 +891,53 @@ J9::CodeGenerator::lowerTreeIfNeeded(
             }
          else
             {
+            // When using balanced GC policy with offheap allocation enabled, there are three possible cases:
+            //
+            // 1.) The object at dest is known to be a non-array object at compile time. In this scenario, the final destination address
+            //     can be calculated by simply adding dest and destOffset.
+            // 2.) The object at dest is known to be an array at compile time. In this scenario, dest and destOffset must be adjusted
+            //     to account for the array header shape that is when offheap is enabled. Once these adjustments are made, the final
+            //     destination address can be calculated by adding the adjusted dest and destOffset, similar to case (1)
+            // 3.) The type of the object at dest is unknown at compile time. In this scenario, a runtime arrayCHK must be generated to
+            //     determine whether dest and destOffset need to be adjusted before calculating the final destination address. Thus, dest
+            //     and destOffset will be passed to setmemoryEvaluator() separately so that both possible control flow paths are accounted
+            //     for in the generated assembly code.
+            //
+            // Note that if the default (gencon) GC policy is being used, no adjustments to dest and destOffset will be needed no matter
+            // the type of the object at dest, so all of the above cases will be treated like case (1).
+
+            //check src/dest baseAddrNode type at compile time
+            int srcSigLen, destSigLen;
+            int objSigLength = strlen("Ljava/lang/Object;");
+            //generate arrayCHK in case (3) only
+            const char *srcObjTypeSig = src->getSymbolReference()->getTypeSignature(srcSigLen);
+            const char *destObjTypeSig = dest->getSymbolReference()->getTypeSignature(destSigLen);
+            bool srcArrayCheckNeeded = TR::Compiler->om.isOffHeapAllocationEnabled() &&
+                                    (srcObjTypeSig == NULL || strncmp(srcObjTypeSig, "Ljava/lang/Object;", objSigLength) == 0);
+            bool destArrayCheckNeeded = TR::Compiler->om.isOffHeapAllocationEnabled() &&
+                                    (destObjTypeSig == NULL || strncmp(destObjTypeSig, "Ljava/lang/Object;", objSigLength) == 0);
+            //adjust dstBaseAddr and dstOffset in cases (2) and (3)
+            bool srcAdjustmentNeeded = srcArrayCheckNeeded ||
+                                    TR::Compiler->om.isOffHeapAllocationEnabled() && srcObjTypeSig[0] == '[';
+            bool destAdjustmentNeeded = destArrayCheckNeeded ||
+                                    TR::Compiler->om.isOffHeapAllocationEnabled() && destObjTypeSig[0] == '[';
+
+            TR::Node *copyMemNode;
+
+            //generate array check if needed
+            if (srcArrayCheckNeeded || destArrayCheckNeeded) // CASE (3)
+               return;
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+            else // CASE (2)
+               {
+               //load dataAddr and use as object base address (previously dest)
+               if (srcAdjustmentNeeded)
+                  src = J9::TransformUtil::generateDataAddrLoadTrees(comp(), src);
+               if (destAdjustmentNeeded)
+                  dest = J9::TransformUtil::generateDataAddrLoadTrees(comp(), dest);
+               }
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
+
             src = TR::Node::create(TR::aladd, 2, src, srcOffset);
             dest = TR::Node::create(TR::aladd, 2, dest, destOffset);
             }
