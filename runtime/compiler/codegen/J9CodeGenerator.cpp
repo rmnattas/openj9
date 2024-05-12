@@ -766,6 +766,59 @@ J9::CodeGenerator::createReferenceReadBarrier(TR::TreeTop* treeTop, TR::Node* pa
 
    }
 
+TR::TreeTop * convertUnsafeCopyMemoryToArrayCopy(TR::Compilation *comp, TR::TreeTop *arrayCopyTT, bool adjustSrc, bool adjustDest)
+   {
+   TR::Node *arrayCopyNode = arrayCopyTT->getNode()->getFirstChild();
+   arrayCopyNode->setNodeIsRecognizedArrayCopyCall(false);
+   TR::Node::recreate(arrayCopyNode, TR::arraycopy);
+
+   TR::Node* adjustedSrc = arrayCopyNode->getChild(1);
+   TR::Node* adjustedDest = arrayCopyNode->getChild(3);
+   if (adjustSrc)
+      adjustedSrc = J9::TransformUtil::generateDataAddrLoadTrees(comp, adjustedSrc);
+   if (adjustDest)
+      adjustedDest = J9::TransformUtil::generateDataAddrLoadTrees(comp, adjustedDest);
+   adjustedSrc = TR::Node::create(TR::aladd, 2, adjustedSrc, arrayCopyNode->getChild(2));
+   adjustedDest = TR::Node::create(TR::aladd, 2, adjustedDest, arrayCopyNode->getChild(4));
+
+   arrayCopyNode->setChild(0, adjustedSrc);
+   arrayCopyNode->setChild(1, adjustedDest);
+   arrayCopyNode->setChild(2, arrayCopyNode->getChild(5));
+   arrayCopyNode->setChild(3, NULL);
+   arrayCopyNode->setChild(4, NULL);
+   arrayCopyNode->setNumChildren(3);
+   return arrayCopyTT;
+   }
+
+TR::TreeTop* generateOffHeapArrayChk(TR::Compilation *comp, TR::Node* objNode, TR::TreeTop* targetTT)
+   {
+      //create arrayCHK treetop
+      //jumps if not array
+
+      // ificmpeq                               -> isArrayNode
+      //   iand                                 -> andNode
+      //     l2i                                -> isArrayField
+      //       lloadi  <isClassAndDepthFlags>
+      //         aloadi  <vft-symbol>           -> vftLoad Node
+      //           aload
+      //     iconst                             -> andConstNode
+      //   ==>iconst                            -> andConstNode
+
+      TR::Node * unsafeAddress = objNode;
+      TR::SymbolReference *newSymbolReferenceForAddress = objNode->getSymbolReference();
+
+      TR::Node *vftLoad = TR::Node::createWithSymRef(TR::aloadi, 1, 1, TR::Node::createWithSymRef(unsafeAddress, comp->il.opCodeForDirectLoad(unsafeAddress->getDataType()), 0, newSymbolReferenceForAddress), comp->getSymRefTab()->findOrCreateVftSymbolRef());
+
+      TR::Node *isArrayField = TR::Node::createWithSymRef(TR::lloadi, 1, 1, vftLoad, comp->getSymRefTab()->findOrCreateClassAndDepthFlagsSymbolRef());
+      isArrayField = TR::Node::create(TR::l2i, 1, isArrayField);
+
+      TR::Node *andConstNode = TR::Node::create(isArrayField, TR::iconst, 0, TR::Compiler->cls.flagValueForArrayCheck(comp));
+      TR::Node *andNode = TR::Node::create(TR::iand, 2, isArrayField, andConstNode);
+      TR::Node *isArrayNode = TR::Node::createif(TR::ificmpeq, andNode, TR::Node::create(TR::iconst, 0), targetTT);
+
+      return TR::TreeTop::create(comp, isArrayNode, NULL, NULL);
+   }
+
 void
 J9::CodeGenerator::lowerTreeIfNeeded(
       TR::Node *node,
@@ -867,7 +920,7 @@ J9::CodeGenerator::lowerTreeIfNeeded(
       }
 
    if (node->getOpCode().isCall() &&
-         node->getSymbol()->getMethodSymbol()->isNative() &&
+         // node->getSymbol()->getMethodSymbol()->isNative() &&
          self()->comp()->canTransformUnsafeCopyToArrayCopy())
       {
       TR::RecognizedMethod rm = node->getSymbol()->castToMethodSymbol()->getRecognizedMethod();
@@ -881,29 +934,218 @@ J9::CodeGenerator::lowerTreeIfNeeded(
          TR::Node *destOffset = node->getChild(4);
          TR::Node *len = node->getChild(5);
 
-         if (self()->comp()->target().is32Bit())
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+         if (TR::Compiler->om.isOffHeapAllocationEnabled())
             {
-            srcOffset = TR::Node::create(TR::l2i, 1, srcOffset);
-            destOffset = TR::Node::create(TR::l2i, 1, destOffset);
-            len = TR::Node::create(TR::l2i, 1, len);
-            src = TR::Node::create(TR::aiadd, 2, src, srcOffset);
-            dest = TR::Node::create(TR::aiadd, 2, dest, destOffset);
+            // When using balanced GC policy with offheap allocation enabled, there are three possible cases:
+            //
+            // 1.) The object at dest is known to be a non-array object at compile time. In this scenario, the final destination address
+            //     can be calculated by simply adding dest and destOffset.
+            // 2.) The object at dest is known to be an array at compile time. In this scenario, dest and destOffset must be adjusted
+            //     to account for the array header shape that is when offheap is enabled. Once these adjustments are made, the final
+            //     destination address can be calculated by adding the adjusted dest and destOffset, similar to case (1)
+            // 3.) The type of the object at dest is unknown at compile time. In this scenario, a runtime arrayCHK must be generated to
+            //     determine whether dest and destOffset need to be adjusted before calculating the final destination address. Thus, dest
+            //     and destOffset will be passed to setmemoryEvaluator() separately so that both possible control flow paths are accounted
+            //     for in the generated assembly code.
+            //
+            // Note that if the default (gencon) GC policy is being used, no adjustments to dest and destOffset will be needed no matter
+            // the type of the object at dest, so all of the above cases will be treated like case (1).
+
+            //check src/dest baseAddrNode type at compile time
+            int srcSigLen, destSigLen;
+            int objSigLength = strlen("Ljava/lang/Object;");
+            //generate arrayCHK in case (3) only
+            const char *srcObjTypeSig = src->getSymbolReference() ? src->getSymbolReference()->getTypeSignature(srcSigLen) : 0;
+            const char *destObjTypeSig = dest->getSymbolReference() ? dest->getSymbolReference()->getTypeSignature(destSigLen) : 0;
+            bool srcArrayCheckNeeded = TR::Compiler->om.isOffHeapAllocationEnabled() &&
+                                    (srcObjTypeSig == NULL || strncmp(srcObjTypeSig, "Ljava/lang/Object;", objSigLength) == 0);
+            bool destArrayCheckNeeded = TR::Compiler->om.isOffHeapAllocationEnabled() &&
+                                    (destObjTypeSig == NULL || strncmp(destObjTypeSig, "Ljava/lang/Object;", objSigLength) == 0);
+            //adjust dstBaseAddr and dstOffset in cases (2) and (3)
+            bool srcAdjustmentNeeded = srcArrayCheckNeeded ||
+                                    TR::Compiler->om.isOffHeapAllocationEnabled() && srcObjTypeSig[0] == '[';
+            bool destAdjustmentNeeded = destArrayCheckNeeded ||
+                                    TR::Compiler->om.isOffHeapAllocationEnabled() && destObjTypeSig[0] == '[';
+
+            //generate array check if needed
+            if (srcArrayCheckNeeded && destArrayCheckNeeded || // CASE (3)
+               ((srcArrayCheckNeeded || destArrayCheckNeeded) && (srcAdjustmentNeeded && destAdjustmentNeeded))) 
+               return; // keep call to vm
+            
+            if (!(srcAdjustmentNeeded || destAdjustmentNeeded)) 
+               {
+               // both src and dest are non-array objects
+               // simple transformation to arraycopy
+               src = TR::Node::create(TR::aladd, 2, src, srcOffset);
+               dest = TR::Node::create(TR::aladd, 2, dest, destOffset);
+               TR::Node *arraycopyNode = TR::Node::createArraycopy(src, dest, len);
+               TR::TreeTop *arrayCopyTT = TR::TreeTop::create(self()->comp(), arraycopyNode, tt->getNextTreeTop(), tt->getPrevTreeTop());
+               tt->getPrevTreeTop()->setNextTreeTop(arrayCopyTT);
+               tt->getNextTreeTop()->setPrevTreeTop(arrayCopyTT);
+               for (int i = 0; i <= 5; i++)
+                  {
+                  node->getChild(i)->decReferenceCount();
+                  }
+               return;
+               }
+
+            // seperate nullchk 
+            TR::TransformUtil::separateNullCheck(self()->comp(), tt);
+
+            // anchor nodes
+            for (int32_t i=1; i < node->getNumChildren(); i++)
+               {
+               if (!node->getChild(i)->getOpCode().isLoadConst())
+                  tt->insertBefore(TR::TreeTop::create(self()->comp(),
+                     TR::Node::create(TR::treetop, 1, node->getChild(i))));
+               }
+
+            TR::CFG *cfg = self()->comp()->getFlowGraph();
+            TR::Block *currentBlock = tt->getEnclosingBlock();
+            TR::Block *callBlock = currentBlock->split(tt, cfg, true);
+            TR::Block *nextBlock = callBlock->split(tt->getNextTreeTop(), cfg, true);
+
+            // TOBEREMOVED
+            self()->comp()->dumpMethodTrees("TEMP", self()->comp()->getMethodSymbol());
+
+            if (srcArrayCheckNeeded || destArrayCheckNeeded)
+               {
+               // if (srcAdjustmentNeeded || destAdjustmentNeeded) // implied one only, same as XArrayCheckNeeded
+               // case 5
+               
+               // generate blocks
+               TR::Block *copyBlock = currentBlock->split(currentBlock->getExit(), cfg);
+               TR::Block *adjustedCopyBlock = currentBlock->split(currentBlock->getExit(), cfg);
+               TR::Block *nullCheckBlock = currentBlock->split(currentBlock->getExit(), cfg);
+
+               // set edges (what about cfg structures?)
+               TR::Node* checkedNode = srcArrayCheckNeeded ? node->getChild(1) : node->getChild(3);
+               currentBlock->append(generateOffHeapArrayChk(self()->comp(), checkedNode->duplicateTree(), copyBlock->getEntry()));
+               cfg->addEdge(currentBlock, copyBlock);
+               nullCheckBlock->append(TR::TreeTop::create(self()->comp(), TR::Node::createif(TR::ifacmpeq, src, TR::Node::create(node, TR::aconst, 0, 0), copyBlock->getEntry())));
+               cfg->addEdge(nullCheckBlock, copyBlock);
+               adjustedCopyBlock->append(TR::TreeTop::create(self()->comp(), TR::Node::create(node, TR::Goto, 0, nextBlock->getEntry())));
+               cfg->addEdge(adjustedCopyBlock, nextBlock);
+
+               if (srcAdjustmentNeeded)
+                  adjustedCopyBlock->prepend(convertUnsafeCopyMemoryToArrayCopy(self()->comp(), tt->duplicateTree(), true, false));
+               else
+                  adjustedCopyBlock->prepend(convertUnsafeCopyMemoryToArrayCopy(self()->comp(), tt->duplicateTree(), false, true));
+               copyBlock->prepend(convertUnsafeCopyMemoryToArrayCopy(self()->comp(), tt, false, false));
+
+               }
+            else
+               {
+               if (srcAdjustmentNeeded && destAdjustmentNeeded)
+                  {
+                  //load dataAddr and use as object base address (previously dest)
+                  // both src and dest are arrays ('[')
+                  
+                  /*
+                  Before:
+                     BBStart A (currentBlock)
+                        ...
+                        <call tree>
+                        ...
+                     BBEnd
+
+                  After:
+                     BBStart A (currentBlock)
+                        ...
+                        <NULLCHK>
+                        <Anchors>
+                        <ifcmp src == null> goto nullDestCheckBlock
+                     BBEnd
+                     BBStart fallthroughDestCheckBlock
+                        <ifcmp dest == null> goto callBlock
+                     BBEnd
+                     BBStart adjustedArrayCopyBlock
+                        <arraycopy with dataAddrPointer>
+                        <goto nextBlock>
+                     BBEnd
+                     BBStart nullDestCheckBlock
+                        <ifcmp dest != null> goto callBlock
+                     BBEnd
+                     BBStart arrayCopyBlock
+                        <arraycopy>
+                        <goto nextBlock>
+                     BBEnd
+                     BBStart callBlock
+                        <call>
+                     BBEnd
+                     BBStart nextBlock
+                        ...
+                     BBEnd
+                  */
+
+                  // generate blocks
+                  TR::Block *arrayCopyBlock = currentBlock->split(currentBlock->getExit(), cfg);
+                  TR::Block *nullDestCheckBlock = currentBlock->split(currentBlock->getExit(), cfg);
+                  TR::Block *adjustedArrayCopyBlock = currentBlock->split(currentBlock->getExit(), cfg);
+                  TR::Block *fallthroughDestCheckBlock = currentBlock->split(currentBlock->getExit(), cfg);
+
+                  // set edges (what about cfg structures?)
+                  currentBlock->append(TR::TreeTop::create(self()->comp(), TR::Node::createif(TR::ifacmpeq, src, TR::Node::create(node, TR::aconst, 0, 0), nullDestCheckBlock->getEntry())));
+                  cfg->addEdge(currentBlock, nullDestCheckBlock);
+                  fallthroughDestCheckBlock->append(TR::TreeTop::create(self()->comp(), TR::Node::createif(TR::ifacmpeq, dest->duplicateTree(), TR::Node::create(node, TR::aconst, 0, 0), callBlock->getEntry())));
+                  cfg->addEdge(fallthroughDestCheckBlock, callBlock);
+                  adjustedArrayCopyBlock->append(TR::TreeTop::create(self()->comp(), TR::Node::create(node, TR::Goto, 0, nextBlock->getEntry())));
+                  cfg->addEdge(adjustedArrayCopyBlock, nextBlock);
+                  nullDestCheckBlock->append(TR::TreeTop::create(self()->comp(), TR::Node::createif(TR::ifacmpne, dest->duplicateTree(), TR::Node::create(node, TR::aconst, 0, 0), callBlock->getEntry())));
+                  cfg->addEdge(nullDestCheckBlock, callBlock);
+                  arrayCopyBlock->append(TR::TreeTop::create(self()->comp(), TR::Node::create(node, TR::Goto, 0, nextBlock->getEntry())));
+                  cfg->addEdge(arrayCopyBlock, nextBlock);
+
+                  adjustedArrayCopyBlock->prepend(convertUnsafeCopyMemoryToArrayCopy(self()->comp(), tt->duplicateTree(), true, true));
+                  arrayCopyBlock->prepend(convertUnsafeCopyMemoryToArrayCopy(self()->comp(), tt->duplicateTree(), false, false));
+                  }
+               else if (srcAdjustmentNeeded || destAdjustmentNeeded) // not both
+                  {
+                  // generate blocks
+                  TR::Block *fallthroughBlock = currentBlock->split(currentBlock->getExit(), cfg);
+
+                  // set edges (what about cfg structures?)
+                  currentBlock->append(TR::TreeTop::create(self()->comp(), TR::Node::createif(TR::ifacmpeq, srcAdjustmentNeeded ? src : dest, TR::Node::create(node, TR::aconst, 0, 0), callBlock->getEntry())));
+                  cfg->addEdge(currentBlock, callBlock);
+                  fallthroughBlock->append(TR::TreeTop::create(self()->comp(), TR::Node::create(node, TR::Goto, 0, nextBlock->getEntry())));
+                  cfg->addEdge(fallthroughBlock, nextBlock);
+
+                  if (srcAdjustmentNeeded)
+                     fallthroughBlock->prepend(convertUnsafeCopyMemoryToArrayCopy(self()->comp(), tt->duplicateTree(), true, false));
+                  else
+                     fallthroughBlock->prepend(convertUnsafeCopyMemoryToArrayCopy(self()->comp(), tt->duplicateTree(), false, true));
+                  convertUnsafeCopyMemoryToArrayCopy(self()->comp(), tt, false, false);
+                  }
+               }
             }
          else
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
             {
-            src = TR::Node::create(TR::aladd, 2, src, srcOffset);
-            dest = TR::Node::create(TR::aladd, 2, dest, destOffset);
-            }
+            if (self()->comp()->target().is32Bit())
+               {
+               srcOffset = TR::Node::create(TR::l2i, 1, srcOffset);
+               destOffset = TR::Node::create(TR::l2i, 1, destOffset);
+               len = TR::Node::create(TR::l2i, 1, len);
+               src = TR::Node::create(TR::aiadd, 2, src, srcOffset);
+               dest = TR::Node::create(TR::aiadd, 2, dest, destOffset);
+               }
+            else
+               {
+               src = TR::Node::create(TR::aladd, 2, src, srcOffset);
+               dest = TR::Node::create(TR::aladd, 2, dest, destOffset);
+               }
 
-         TR::Node *arraycopyNode = TR::Node::createArraycopy(src, dest, len);
-         TR::TreeTop *arrayCopyTT = TR::TreeTop::create(self()->comp(), arraycopyNode, tt->getNextTreeTop(), tt->getPrevTreeTop());
+            TR::Node *arraycopyNode = TR::Node::createArraycopy(src, dest, len);
+            TR::TreeTop *arrayCopyTT = TR::TreeTop::create(self()->comp(), arraycopyNode, tt->getNextTreeTop(), tt->getPrevTreeTop());
 
-         tt->getPrevTreeTop()->setNextTreeTop(arrayCopyTT);
-         tt->getNextTreeTop()->setPrevTreeTop(arrayCopyTT);
+            tt->getPrevTreeTop()->setNextTreeTop(arrayCopyTT);
+            tt->getNextTreeTop()->setPrevTreeTop(arrayCopyTT);
 
-         for (int i = 0; i <= 5; i++)
-            {
-            node->getChild(i)->decReferenceCount();
+            for (int i = 0; i <= 5; i++)
+               {
+               node->getChild(i)->decReferenceCount();
+               }
             }
 
          return;
