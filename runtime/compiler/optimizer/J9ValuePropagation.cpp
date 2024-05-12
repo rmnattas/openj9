@@ -678,9 +678,32 @@ bool J9::ValuePropagation::transformUnsafeCopyMemoryCall(TR::Node *arraycopyNode
       TR::TreeTop *tt = _curTree;
       TR::Node *ttNode = tt->getNode();
 
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+      if (TR::Compiler->om.isOffHeapAllocationEnabled()
+            && (ttNode->getOpCodeValue() == TR::treetop || ttNode->getOpCode().isResolveOrNullCheck()))
+         {
+         OMR::ValuePropagation *vp = this;
+         ListIterator<OMR::ValuePropagation::TR_TreeTopNodePair> copyMemoryIt(&vp->_offHeapCopyMemory);
+         bool alreadyAdded = false;
+         OMR::ValuePropagation::TR_TreeTopNodePair *copyMemoryPair;
+         for (copyMemoryPair = copyMemoryIt.getFirst();
+            copyMemoryPair; copyMemoryPair = copyMemoryIt.getNext())
+            {
+            if (copyMemoryPair->_node == arraycopyNode)
+               {
+               alreadyAdded = true;
+               break;
+               }
+            }
+
+         if (!alreadyAdded)
+            vp->_offHeapCopyMemory.add(new (vp->comp()->trStackMemory()) OMR::ValuePropagation::TR_TreeTopNodePair(tt, arraycopyNode));
+         return false;
+         }
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
+
       if ((ttNode->getOpCodeValue() == TR::treetop || ttNode->getOpCode().isResolveOrNullCheck())
             && performTransformation(comp(), "%sChanging call Unsafe.copyMemory [%p] to arraycopy\n", OPT_DETAILS, arraycopyNode))
-
          {
          TR::Node *unsafe     = arraycopyNode->getChild(0);
          TR::Node *src        = arraycopyNode->getChild(1);
