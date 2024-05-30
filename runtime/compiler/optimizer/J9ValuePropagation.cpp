@@ -486,18 +486,14 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
    return false;
    }
 
-TR::TreeTop * convertUnsafeCopyMemoryToArrayCopy(TR::Compilation *comp, TR::TreeTop *arrayCopyTT, bool adjustSrc, bool adjustDest)
+TR::TreeTop * convertUnsafeCopyMemoryToArrayCopy(TR::Compilation *comp, TR::TreeTop *arrayCopyTT, TR::SymbolReference * srcRef, TR::SymbolReference * destRef)
    {
    TR::Node *arrayCopyNode = arrayCopyTT->getNode()->getFirstChild();
    arrayCopyNode->setNodeIsRecognizedArrayCopyCall(false);
    TR::Node::recreate(arrayCopyNode, TR::arraycopy);
 
-   TR::Node* adjustedSrc = arrayCopyNode->getChild(1);
-   TR::Node* adjustedDest = arrayCopyNode->getChild(3);
-   if (adjustSrc)
-      adjustedSrc = J9::TransformUtil::generateDataAddrLoadTrees(comp, adjustedSrc);
-   if (adjustDest)
-      adjustedDest = J9::TransformUtil::generateDataAddrLoadTrees(comp, adjustedDest);
+   TR::Node* adjustedSrc = srcRef ? TR::Node::createLoad(arrayCopyNode, srcRef) : arrayCopyNode->getChild(1);
+   TR::Node* adjustedDest = destRef ? TR::Node::createLoad(arrayCopyNode, destRef) : arrayCopyNode->getChild(3);
    adjustedSrc = TR::Node::create(TR::aladd, 2, adjustedSrc, arrayCopyNode->getChild(2));
    adjustedDest = TR::Node::create(TR::aladd, 2, adjustedDest, arrayCopyNode->getChild(4));
 
@@ -510,7 +506,26 @@ TR::TreeTop * convertUnsafeCopyMemoryToArrayCopy(TR::Compilation *comp, TR::Tree
    return arrayCopyTT;
    }
 
-TR::TreeTop* generateOffHeapArrayChk(TR::Compilation *comp, TR::Node* objNode, TR::TreeTop* targetTT)
+TR::Block* insertCheckAndAdjustForOffHeap(TR::Compilation *comp, TR::Node* node, TR::SymbolReference* symRef, TR::Block* callBlock, TR::CFG* cfg)
+   {
+      node = node->duplicateTree();
+      TR::Block *newCallBlock = callBlock->split(callBlock->getEntry()->getNextTreeTop(), cfg);
+      TR::Block *checkBlock = callBlock;
+      TR::Block *adjustBlock = checkBlock->split(checkBlock->getExit(), cfg);
+
+      checkBlock->append(TR::TreeTop::create(comp, TR::Node::createif(TR::ifacmpeq, node, TR::Node::create(node, TR::aconst, 0, 0), newCallBlock->getEntry())));
+      cfg->addEdge(checkBlock, newCallBlock);
+
+      node = J9::TransformUtil::generateDataAddrLoadTrees(comp, TR::Node::createLoad(node, symRef));
+      // node->createStoresForVar(symRef, adjustBlock->getExit(), true);
+      TR::Node *newStore = TR::Node::createStore(symRef, node);
+      TR::TreeTop *newStoreTree = TR::TreeTop::create(comp, newStore);
+      adjustBlock->append(newStoreTree);
+
+      return newCallBlock;
+   }
+
+TR::Block* insertOffHeapArrayChk(TR::Compilation *comp, TR::Node* node, TR::SymbolReference* symRef, TR::Block* callBlock, TR::CFG* cfg)
    {
       //create arrayCHK treetop
       //jumps if ref is not an array
@@ -524,19 +539,22 @@ TR::TreeTop* generateOffHeapArrayChk(TR::Compilation *comp, TR::Node* objNode, T
       //     iconst                             -> andConstNode
       //     iconst 0
 
-      TR::Node * unsafeAddress = objNode;
-      TR::SymbolReference *newSymbolReferenceForAddress = objNode->getSymbolReference();
+      TR::Block *newCallBlock = insertCheckAndAdjustForOffHeap(comp, node, symRef, callBlock, cfg);
+      TR::Block *checkBlock = callBlock->split(callBlock->getExit(), cfg);
 
+      TR::Node * unsafeAddress = node->duplicateTree();
+      TR::SymbolReference *newSymbolReferenceForAddress = node->getSymbolReference();
       TR::Node *vftLoad = TR::Node::createWithSymRef(TR::aloadi, 1, 1, TR::Node::createWithSymRef(unsafeAddress, comp->il.opCodeForDirectLoad(unsafeAddress->getDataType()), 0, newSymbolReferenceForAddress), comp->getSymRefTab()->findOrCreateVftSymbolRef());
-
       TR::Node *isArrayField = TR::Node::createWithSymRef(TR::lloadi, 1, 1, vftLoad, comp->getSymRefTab()->findOrCreateClassAndDepthFlagsSymbolRef());
       isArrayField = TR::Node::create(TR::l2i, 1, isArrayField);
-
       TR::Node *andConstNode = TR::Node::create(isArrayField, TR::iconst, 0, TR::Compiler->cls.flagValueForArrayCheck(comp));
       TR::Node *andNode = TR::Node::create(TR::iand, 2, isArrayField, andConstNode);
-      TR::Node *isArrayNode = TR::Node::createif(TR::ificmpeq, andNode, TR::Node::create(TR::iconst, 0), targetTT);
+      TR::Node *isArrayNode = TR::Node::createif(TR::ificmpeq, andNode, TR::Node::create(node, TR::iconst, 0), newCallBlock->getEntry());
+      checkBlock->append(TR::TreeTop::create(comp, isArrayNode, NULL, NULL));
+      cfg->addEdge(callBlock, newCallBlock);
 
-      return TR::TreeTop::create(comp, isArrayNode, NULL, NULL);
+
+      return newCallBlock;
    }
 
 bool J9::ValuePropagation::transformUnsafeCopyMemoryCall(TR::Node *arraycopyNode)
@@ -593,8 +611,8 @@ bool J9::ValuePropagation::transformUnsafeCopyMemoryCall(TR::Node *arraycopyNode
             bool srcAdjustmentNeeded = srcArrayCheckNeeded || srcObjTypeSig[0] == '[';
             bool destAdjustmentNeeded = destArrayCheckNeeded || destObjTypeSig[0] == '[';
 
-            if (srcArrayCheckNeeded && destArrayCheckNeeded) // Case 3
-               return false; // keep call to vm
+            // if (srcArrayCheckNeeded && destArrayCheckNeeded) // Case 3
+            //    return false; // keep call to vm
             
             if (!(srcAdjustmentNeeded || destAdjustmentNeeded)) // Case 1
                {
@@ -629,152 +647,81 @@ bool J9::ValuePropagation::transformUnsafeCopyMemoryCall(TR::Node *arraycopyNode
             TR::Block *callBlock = currentBlock->split(tt, cfg, true);
             TR::Block *nextBlock = callBlock->split(tt->getNextTreeTop(), cfg, true);
 
-            //if (srcArrayCheckNeeded && destArrayCheckNeeded) //case 3 ignored above
-            //else
-            if (srcArrayCheckNeeded || destArrayCheckNeeded)// not both
+            if (srcArrayCheckNeeded && destArrayCheckNeeded) // Case 3 ignored above
+               {
+               TR::SymbolReference *adjustSrcTempRef = NULL;
+               TR::SymbolReference *adjustDestTempRef = NULL;
+               src->createStoresForVar(adjustSrcTempRef, currentBlock->getExit());
+               dest->createStoresForVar(adjustDestTempRef, currentBlock->getExit());
+
+               callBlock = insertOffHeapArrayChk(comp(), arraycopyNode->getChild(1), adjustSrcTempRef, callBlock, cfg);
+               callBlock = insertOffHeapArrayChk(comp(), arraycopyNode->getChild(3), adjustDestTempRef, callBlock, cfg);
+
+               convertUnsafeCopyMemoryToArrayCopy(comp(), tt, adjustSrcTempRef, adjustDestTempRef);
+               }
+            else if (srcArrayCheckNeeded || destArrayCheckNeeded)// not both
                {
                if (srcAdjustmentNeeded && destAdjustmentNeeded) // Case 6
                   {
-                  // generate blocks
-                  TR::Block *adjust01Block = currentBlock->split(currentBlock->getExit(), cfg);
-                  TR::Block *nullCheckArrayNotAdjustedBlock = currentBlock->split(currentBlock->getExit(), cfg);
-                  TR::Block *adjust10Block = currentBlock->split(currentBlock->getExit(), cfg);
-                  TR::Block *adjust11Block = currentBlock->split(currentBlock->getExit(), cfg);
-                  TR::Block *nullCheckArrayBlock = currentBlock->split(currentBlock->getExit(), cfg);
-                  TR::Block *arrChkBlock = currentBlock->split(currentBlock->getExit(), cfg);
-
-                  // set edges (what about cfg structures?)
-                  currentBlock->append(TR::TreeTop::create(comp(), TR::Node::createif(TR::ifacmpeq, srcArrayCheckNeeded ? src : dest, TR::Node::create(arraycopyNode, TR::aconst, 0, 0), nullCheckArrayNotAdjustedBlock->getEntry())));
-                  cfg->addEdge(currentBlock, nullCheckArrayNotAdjustedBlock);
-                  arrChkBlock->append(generateOffHeapArrayChk(comp(), arraycopyNode->getChild(srcArrayCheckNeeded ? 1 : 3)->duplicateTree(), nullCheckArrayNotAdjustedBlock->getEntry()));
-                  cfg->addEdge(arrChkBlock, nullCheckArrayNotAdjustedBlock);
-                  nullCheckArrayBlock->append(TR::TreeTop::create(comp(), TR::Node::createif(TR::ifacmpeq, arraycopyNode->getChild(srcArrayCheckNeeded ? 3 : 1)->duplicateTree(), TR::Node::create(arraycopyNode, TR::aconst, 0, 0), adjust10Block->getEntry())));
-                  cfg->addEdge(nullCheckArrayBlock, adjust10Block);
-                  adjust11Block->append(TR::TreeTop::create(comp(), TR::Node::create(arraycopyNode, TR::Goto, 0, nextBlock->getEntry())));
-                  cfg->addEdge(adjust11Block, nextBlock);
-                  adjust10Block->append(TR::TreeTop::create(comp(), TR::Node::create(arraycopyNode, TR::Goto, 0, nextBlock->getEntry())));
-                  cfg->addEdge(adjust10Block, nextBlock);
-                  nullCheckArrayNotAdjustedBlock->append(TR::TreeTop::create(comp(), TR::Node::createif(TR::ifacmpeq, arraycopyNode->getChild(srcArrayCheckNeeded ? 3 : 1)->duplicateTree(), TR::Node::create(arraycopyNode, TR::aconst, 0, 0), callBlock->getEntry())));
-                  cfg->addEdge(nullCheckArrayNotAdjustedBlock, callBlock);
-                  adjust01Block->append(TR::TreeTop::create(comp(), TR::Node::create(arraycopyNode, TR::Goto, 0, nextBlock->getEntry())));
-                  cfg->addEdge(adjust01Block, nextBlock);
-
-                  adjust11Block->prepend(convertUnsafeCopyMemoryToArrayCopy(comp(), tt->duplicateTree(), true, true));
-                  adjust10Block->prepend(convertUnsafeCopyMemoryToArrayCopy(comp(), tt->duplicateTree(), srcArrayCheckNeeded, !srcArrayCheckNeeded));
-                  adjust01Block->prepend(convertUnsafeCopyMemoryToArrayCopy(comp(), tt->duplicateTree(), !srcArrayCheckNeeded, srcArrayCheckNeeded));
-                  convertUnsafeCopyMemoryToArrayCopy(comp(), tt, false, false);
-                  }
-               else // Case 5 // if (srcAdjustmentNeeded || destAdjustmentNeeded) implied one only
-                  {             
-                  // generate blocks
-                  TR::Block *adjustedCopyBlock = currentBlock->split(currentBlock->getExit(), cfg);
-                  TR::Block *arrChkBlock = currentBlock->split(currentBlock->getExit(), cfg);
-
-                  // set edges (what about cfg structures?)
-                  currentBlock->append(TR::TreeTop::create(comp(), TR::Node::createif(TR::ifacmpeq, srcArrayCheckNeeded ? src : dest, TR::Node::create(arraycopyNode, TR::aconst, 0, 0), callBlock->getEntry())));
-                  cfg->addEdge(currentBlock, callBlock);
-                  arrChkBlock->append(generateOffHeapArrayChk(comp(), arraycopyNode->getChild(srcArrayCheckNeeded ? 1 : 3)->duplicateTree(), callBlock->getEntry()));
-                  cfg->addEdge(arrChkBlock, callBlock);
-                  adjustedCopyBlock->append(TR::TreeTop::create(comp(), TR::Node::create(arraycopyNode, TR::Goto, 0, nextBlock->getEntry())));
-                  cfg->addEdge(adjustedCopyBlock, nextBlock);
+                  TR::SymbolReference *adjustSrcTempRef = NULL;
+                  TR::SymbolReference *adjustDestTempRef = NULL;
+                  src->createStoresForVar(adjustSrcTempRef, currentBlock->getExit());
+                  dest->createStoresForVar(adjustDestTempRef, currentBlock->getExit());
 
                   if (srcArrayCheckNeeded)
-                     adjustedCopyBlock->prepend(convertUnsafeCopyMemoryToArrayCopy(comp(), tt->duplicateTree(), true, false));
+                     {
+                     callBlock = insertOffHeapArrayChk(comp(), arraycopyNode->getChild(1), adjustSrcTempRef, callBlock, cfg);
+                     callBlock = insertCheckAndAdjustForOffHeap(comp(), arraycopyNode->getChild(3), adjustDestTempRef, callBlock, cfg);
+                     }
                   else
-                     adjustedCopyBlock->prepend(convertUnsafeCopyMemoryToArrayCopy(comp(), tt->duplicateTree(), false, true));
-                  convertUnsafeCopyMemoryToArrayCopy(comp(), tt, false, false);
+                     {
+                     callBlock = insertCheckAndAdjustForOffHeap(comp(), arraycopyNode->getChild(1), adjustSrcTempRef, callBlock, cfg);
+                     callBlock = insertOffHeapArrayChk(comp(), arraycopyNode->getChild(3), adjustDestTempRef, callBlock, cfg);
+                     }
+
+                  convertUnsafeCopyMemoryToArrayCopy(comp(), tt, adjustSrcTempRef, adjustDestTempRef);
+                  }
+               else // Case 5 // if (srcAdjustmentNeeded || destAdjustmentNeeded) implied one only
+                  {
+                  TR::Node* adjustNode = srcAdjustmentNeeded ? src : dest;
+                  TR::SymbolReference *adjustTempRef = NULL;
+                  adjustNode->createStoresForVar(adjustTempRef, currentBlock->getExit());
+
+                  callBlock = insertOffHeapArrayChk(comp(), arraycopyNode->getChild(srcArrayCheckNeeded ? 1 : 3), adjustTempRef, callBlock, cfg);
+
+                  if (srcArrayCheckNeeded)
+                     convertUnsafeCopyMemoryToArrayCopy(comp(), tt, adjustTempRef, NULL);
+                  else
+                     convertUnsafeCopyMemoryToArrayCopy(comp(), tt, NULL, adjustTempRef);
                   }
                }
             else
                {
                if (srcAdjustmentNeeded && destAdjustmentNeeded) // Case 2
                   {
-                  //load dataAddr and use as object base address (previously dest)
-                  // both src and dest are arrays ('[')
-                  
-                  /*
-                  Before:
-                     BBStart A (currentBlock)
-                        ...
-                        <call tree>
-                        ...
-                     BBEnd
+                  TR::SymbolReference *adjustSrcTempRef = NULL;
+                  TR::SymbolReference *adjustDestTempRef = NULL;
+                  src->createStoresForVar(adjustSrcTempRef, currentBlock->getExit());
+                  dest->createStoresForVar(adjustDestTempRef, currentBlock->getExit());
 
-                  After:
-                     BBStart A (currentBlock)
-                        ...
-                        <NULLCHK>
-                        <Anchors>
-                        <ifcmp src == null> goto nullDestCheckBlock
-                     BBEnd
-                     BBStart fallthroughDestCheckBlock
-                        <ifcmp dest == null> goto adjust10Block
-                     BBEnd
-                     BBStart adjustedArrayCopyBlock
-                        <arraycopy with dataAddrPointer>
-                        <goto nextBlock>
-                     BBEnd
-                     BBStart adjust10Block
-                        <arraycopy with adjust 10>
-                        <goto nextBlock>
-                     BBEnd
-                     BBStart nullDestCheckBlock
-                        <ifcmp dest == null> goto callBlock
-                     BBEnd
-                     BBStart adjust01Block
-                        <arraycopy with adjust 01>
-                        <goto nextBlock>
-                     BBEnd
-                     BBStart callBlock
-                        <arraycopy no adjust>
-                     BBEnd
-                     BBStart nextBlock
-                        ...
-                     BBEnd
-                  */
+                  callBlock = insertCheckAndAdjustForOffHeap(comp(), arraycopyNode->getChild(1), adjustSrcTempRef, callBlock, cfg);
+                  callBlock = insertCheckAndAdjustForOffHeap(comp(), arraycopyNode->getChild(3), adjustDestTempRef, callBlock, cfg);
 
-                  // generate blocks
-                  TR::Block *adjust01Block = currentBlock->split(currentBlock->getExit(), cfg);
-                  TR::Block *nullDestCheckBlock = currentBlock->split(currentBlock->getExit(), cfg);
-                  TR::Block *adjust10Block = currentBlock->split(currentBlock->getExit(), cfg);
-                  TR::Block *adjustedArrayCopyBlock = currentBlock->split(currentBlock->getExit(), cfg);
-                  TR::Block *fallthroughDestCheckBlock = currentBlock->split(currentBlock->getExit(), cfg);
-
-                  // set edges (what about cfg structures?)
-                  currentBlock->append(TR::TreeTop::create(comp(), TR::Node::createif(TR::ifacmpeq, src, TR::Node::create(arraycopyNode, TR::aconst, 0, 0), nullDestCheckBlock->getEntry())));
-                  cfg->addEdge(currentBlock, nullDestCheckBlock);
-                  fallthroughDestCheckBlock->append(TR::TreeTop::create(comp(), TR::Node::createif(TR::ifacmpeq, arraycopyNode->getChild(3)->duplicateTree(), TR::Node::create(arraycopyNode, TR::aconst, 0, 0), adjust10Block->getEntry())));
-                  cfg->addEdge(fallthroughDestCheckBlock, adjust10Block);
-                  adjustedArrayCopyBlock->append(TR::TreeTop::create(comp(), TR::Node::create(arraycopyNode, TR::Goto, 0, nextBlock->getEntry())));
-                  cfg->addEdge(adjustedArrayCopyBlock, nextBlock);
-                  adjust10Block->append(TR::TreeTop::create(comp(), TR::Node::create(arraycopyNode, TR::Goto, 0, nextBlock->getEntry())));
-                  cfg->addEdge(adjust10Block, nextBlock);
-                  nullDestCheckBlock->append(TR::TreeTop::create(comp(), TR::Node::createif(TR::ifacmpeq, arraycopyNode->getChild(3)->duplicateTree(), TR::Node::create(arraycopyNode, TR::aconst, 0, 0), callBlock->getEntry())));
-                  cfg->addEdge(nullDestCheckBlock, callBlock);
-                  adjust01Block->append(TR::TreeTop::create(comp(), TR::Node::create(arraycopyNode, TR::Goto, 0, nextBlock->getEntry())));
-                  cfg->addEdge(adjust01Block, nextBlock);
-
-                  adjustedArrayCopyBlock->prepend(convertUnsafeCopyMemoryToArrayCopy(comp(), tt->duplicateTree(), true, true));
-                  adjust10Block->prepend(convertUnsafeCopyMemoryToArrayCopy(comp(), tt->duplicateTree(), true, false));
-                  adjust01Block->prepend(convertUnsafeCopyMemoryToArrayCopy(comp(), tt->duplicateTree(), false, true));
-                  convertUnsafeCopyMemoryToArrayCopy(comp(), tt, false, false); // already in callBlock
+                  convertUnsafeCopyMemoryToArrayCopy(comp(), tt, adjustSrcTempRef, adjustDestTempRef);
                   }
                else if (srcAdjustmentNeeded || destAdjustmentNeeded) // Case 4
                   {
-                  // generate blocks
-                  TR::Block *fallthroughBlock = currentBlock->split(currentBlock->getExit(), cfg);
+                  TR::Node* adjustNode = srcAdjustmentNeeded ? src : dest;
+                  TR::SymbolReference *adjustTempRef = NULL;
+                  adjustNode->createStoresForVar(adjustTempRef, currentBlock->getExit());
 
-                  // set edges (what about cfg structures?)
-                  currentBlock->append(TR::TreeTop::create(comp(), TR::Node::createif(TR::ifacmpeq, srcAdjustmentNeeded ? src : dest, TR::Node::create(arraycopyNode, TR::aconst, 0, 0), callBlock->getEntry())));
-                  cfg->addEdge(currentBlock, callBlock);
-                  fallthroughBlock->append(TR::TreeTop::create(comp(), TR::Node::create(arraycopyNode, TR::Goto, 0, nextBlock->getEntry())));
-                  cfg->addEdge(fallthroughBlock, nextBlock);
+                  callBlock = insertCheckAndAdjustForOffHeap(comp(), arraycopyNode->getChild(srcAdjustmentNeeded ? 1 : 3), adjustTempRef, callBlock, cfg);
 
                   if (srcAdjustmentNeeded)
-                     fallthroughBlock->prepend(convertUnsafeCopyMemoryToArrayCopy(comp(), tt->duplicateTree(), true, false));
+                     convertUnsafeCopyMemoryToArrayCopy(comp(), tt, adjustTempRef, NULL);
                   else
-                     fallthroughBlock->prepend(convertUnsafeCopyMemoryToArrayCopy(comp(), tt->duplicateTree(), false, true));
-                  convertUnsafeCopyMemoryToArrayCopy(comp(), tt, false, false); // already in callBlock
+                     convertUnsafeCopyMemoryToArrayCopy(comp(), tt, NULL, adjustTempRef);
+
                   }
                }
             return true;
