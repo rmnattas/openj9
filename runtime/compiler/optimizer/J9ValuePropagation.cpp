@@ -552,14 +552,14 @@ TR::TreeTop * convertUnsafeCopyMemoryCallToArrayCopyWithLoad(TR::Compilation *co
  * \return
  *    Return the new call block.
  */
-TR::Block* insertUnsafeCallArgumentChecksAndAdjustForOffHeap(TR::Compilation *comp, TR::Node* node, TR::SymbolReference* symRef, TR::Block* callBlock, bool insertArrayCheck, TR::CFG* cfg)
+TR::Block* insertUnsafeCallArgumentChecksAndAdjustForOffHeap(TR::Compilation *comp, TR::SymbolReference* symRef, TR::Block* callBlock, bool insertArrayCheck, TR::Node* originatingByteCodeNode, TR::CFG* cfg)
    {
    TR::Block *nullCheckBlock = callBlock;
    TR::Block *newCallBlock = nullCheckBlock->split(nullCheckBlock->getEntry()->getNextTreeTop(), cfg);
    TR::Block *adjustBlock = nullCheckBlock->split(nullCheckBlock->getExit(), cfg);
 
    // Insert null check trees
-   TR::Node* nullCheckNode = TR::Node::createif(TR::ifacmpeq, node->duplicateTree(), TR::Node::create(node, TR::aconst, 0, 0), newCallBlock->getEntry());
+   TR::Node* nullCheckNode = TR::Node::createif(TR::ifacmpeq, TR::Node::createLoad(originatingByteCodeNode, symRef), TR::Node::create(originatingByteCodeNode, TR::aconst, 0, 0), newCallBlock->getEntry());
    nullCheckBlock->append(TR::TreeTop::create(comp, nullCheckNode));
    cfg->addEdge(nullCheckBlock, newCallBlock);
 
@@ -567,19 +567,19 @@ TR::Block* insertUnsafeCallArgumentChecksAndAdjustForOffHeap(TR::Compilation *co
       {
       TR::Block* arrayCheckBlock = callBlock->split(callBlock->getExit(), cfg);
 
-      TR::Node *vftLoad = TR::Node::createWithSymRef(TR::aloadi, 1, 1, node->duplicateTree(), comp->getSymRefTab()->findOrCreateVftSymbolRef());
+      TR::Node *vftLoad = TR::Node::createWithSymRef(TR::aloadi, 1, 1, TR::Node::createLoad(originatingByteCodeNode, symRef), comp->getSymRefTab()->findOrCreateVftSymbolRef());
       TR::Node *isArrayField = TR::Node::createWithSymRef(TR::lloadi, 1, 1, vftLoad, comp->getSymRefTab()->findOrCreateClassAndDepthFlagsSymbolRef());
       isArrayField = TR::Node::create(TR::l2i, 1, isArrayField);
       TR::Node *andConstNode = TR::Node::create(isArrayField, TR::iconst, 0, TR::Compiler->cls.flagValueForArrayCheck(comp));
       TR::Node *andNode = TR::Node::create(TR::iand, 2, isArrayField, andConstNode);
-      TR::Node *arrayCheckNode = TR::Node::createif(TR::ificmpeq, andNode, TR::Node::create(node, TR::iconst, 0), newCallBlock->getEntry());
+      TR::Node *arrayCheckNode = TR::Node::createif(TR::ificmpeq, andNode, TR::Node::create(originatingByteCodeNode, TR::iconst, 0), newCallBlock->getEntry());
 
       arrayCheckBlock->append(TR::TreeTop::create(comp, arrayCheckNode, NULL, NULL));
       cfg->addEdge(callBlock, newCallBlock);
       }
 
    // Insert adjust trees
-   TR::Node* adjustedNode = J9::TransformUtil::generateDataAddrLoadTrees(comp, TR::Node::createLoad(node, symRef));
+   TR::Node* adjustedNode = J9::TransformUtil::generateDataAddrLoadTrees(comp, TR::Node::createLoad(originatingByteCodeNode, symRef));
    TR::Node *newStore = TR::Node::createStore(symRef, adjustedNode);
    TR::TreeTop *newStoreTree = TR::TreeTop::create(comp, newStore);
    adjustBlock->append(newStoreTree);
@@ -615,29 +615,24 @@ bool J9::ValuePropagation::transformUnsafeCopyMemoryCall(TR::Node *arraycopyNode
             {
             // When using balanced GC policy with offheap allocation enabled, there are three possible for an argument type:
             //
-            // A.) The type is known to be a non-array object at compile time. In this scenario, the final address
+            // 1.) The type is known to be a non-array object at compile time. In this scenario, the final address
             //     can be calculated by simply adding ref and offset.
-            // B.) The type is known to be an array at compile time. In this scenario, if the ref at runtime is `null` then
+            // 2.) The type is known to be an array at compile time. In this scenario, if the ref at runtime is `null` then
             //     final address is calculated as in case A. If not `null` then final address is the adjusted ref, by loading 
             //     the dataAddr pointer field then add it to the offset.
-            // C.) The type of the object at dest is unknown at compile time (type is `java/lang/Object`). In this scenario, 
+            // 3.) The type of the object at dest is unknown at compile time (type is `java/lang/Object`). In this scenario, 
             //     a runtime null check and arrayCHK must be generated to determine whether it needs to be handled such as
             //     case A or case B.
-            //
-            // This results in 6 possible cases when combining both copyMemory's src and dest arguments:
-            //
-            // 1.) Both are case A        2.) Both are case B        3.) Both are case C
-            // 4.) One argument is case A and one is case B
-            // 5.) One argument is case A and one is case C
-            // 6.) One argument is case B and one is case C
 
-            //check src/dest type at compile time
+            // Check src/dest type at compile time
             int srcSigLen, destSigLen;
             int objSigLength = strlen("Ljava/lang/Object;");
             const char *srcObjTypeSig = src->getSymbolReference() ? src->getSymbolReference()->getTypeSignature(srcSigLen) : 0;
             const char *destObjTypeSig = dest->getSymbolReference() ? dest->getSymbolReference()->getTypeSignature(destSigLen) : 0;
+            // Case 3
             bool srcArrayCheckNeeded = srcObjTypeSig == NULL || strncmp(srcObjTypeSig, "Ljava/lang/Object;", objSigLength) == 0;
             bool destArrayCheckNeeded = destObjTypeSig == NULL || strncmp(destObjTypeSig, "Ljava/lang/Object;", objSigLength) == 0;
+            // Case 2 & 3
             bool srcAdjustmentNeeded = srcArrayCheckNeeded || srcObjTypeSig[0] == '[';
             bool destAdjustmentNeeded = destArrayCheckNeeded || destObjTypeSig[0] == '[';
             
@@ -649,7 +644,7 @@ bool J9::ValuePropagation::transformUnsafeCopyMemoryCall(TR::Node *arraycopyNode
                return true;
                }
 
-            // anchor nodes
+            // Anchor nodes
             for (int32_t i=1; i < arraycopyNode->getNumChildren(); i++)
                {
                if (!arraycopyNode->getChild(i)->getOpCode().isLoadConst())
@@ -666,12 +661,12 @@ bool J9::ValuePropagation::transformUnsafeCopyMemoryCall(TR::Node *arraycopyNode
             if (srcAdjustmentNeeded)
                {
                src->createStoresForVar(adjustSrcTempRef, currentBlock->getExit());
-               callBlock = insertUnsafeCallArgumentChecksAndAdjustForOffHeap(comp(), arraycopyNode->getChild(1), adjustSrcTempRef, callBlock, srcArrayCheckNeeded, cfg);
+               callBlock = insertUnsafeCallArgumentChecksAndAdjustForOffHeap(comp(), adjustSrcTempRef, callBlock, srcArrayCheckNeeded, arraycopyNode, cfg);
                }
             if (destAdjustmentNeeded)
                {
                dest->createStoresForVar(adjustDestTempRef, currentBlock->getExit());
-               callBlock = insertUnsafeCallArgumentChecksAndAdjustForOffHeap(comp(), arraycopyNode->getChild(3), adjustDestTempRef, callBlock, destArrayCheckNeeded, cfg);
+               callBlock = insertUnsafeCallArgumentChecksAndAdjustForOffHeap(comp(), adjustDestTempRef, callBlock, destArrayCheckNeeded, arraycopyNode, cfg);
                }
 
             convertUnsafeCopyMemoryCallToArrayCopyWithLoad(comp(), tt, adjustSrcTempRef, adjustDestTempRef);
