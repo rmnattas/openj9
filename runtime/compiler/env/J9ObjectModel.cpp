@@ -686,6 +686,7 @@ J9::ObjectModel::getAddressOfElement(TR::Compilation* comp, uintptr_t objectPoin
       {
       basePointer = *(uintptr_t *)(objectPointer + TR::Compiler->om.offsetOfContiguousDataAddrField());
       totalOffset = offset - static_cast<int32_t>(TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+      return basePointer + totalOffset;
       }
 #endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
    if (!TR::Compiler->om.isDiscontiguousArray(comp, objectPointer))
