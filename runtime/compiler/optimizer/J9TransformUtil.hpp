@@ -378,7 +378,7 @@ public:
     * \return
     *    Return the new call block.
     */
-   static TR::Block* insertUnsafeCopyMemoryArgumentChecksAndAdjustForOffHeap(TR::Compilation *comp, TR::SymbolReference* symRef, TR::Block* callBlock, bool insertArrayCheck, TR::Node* originatingByteCodeNode, TR::CFG* cfg);
+   static TR::Block* insertUnsafeCopyMemoryArgumentChecksAndAdjustForOffHeap(TR::Compilation *comp, TR::Node* node, TR::SymbolReference* symRef, TR::Block* callBlock, bool insertArrayCheck, TR::CFG* cfg);
 
    /**
     * \brief

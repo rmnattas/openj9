@@ -2649,7 +2649,7 @@ TR::TreeTop* J9::TransformUtil::convertUnsafeCopyMemoryCallToArrayCopyWithSymRef
 
    }
 
-TR::Block* J9::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOffHeap(TR::Compilation *comp, TR::SymbolReference* symRef, TR::Block* callBlock, bool insertArrayCheck, TR::Node* originatingByteCodeNode, TR::CFG* cfg)
+TR::Block* J9::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOffHeap(TR::Compilation *comp, TR::Node* node, TR::SymbolReference* symRef, TR::Block* callBlock, bool insertArrayCheck, TR::CFG* cfg)
    {
    /**
     *    Called if src/dest type is array (insertArrayCheck = false) or `java/lang/Object` (insertArrayCheck = true)
@@ -2677,7 +2677,7 @@ TR::Block* J9::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOf
     *    BBStart
     *    astore  temp symRef
     *      aloadi  <contiguousArrayDataAddrFieldSymbol>
-    *        aload  temp symRef              // temp symRef originally have src/dest
+    *        aload  src/dest
     *    BBEnd
     */
 
@@ -2686,7 +2686,7 @@ TR::Block* J9::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOf
    TR::Block *adjustBlock = nullCheckBlock->split(nullCheckBlock->getExit(), cfg);
 
    // Insert null check trees
-   TR::Node* nullCheckNode = TR::Node::createif(TR::ifacmpeq, TR::Node::createLoad(originatingByteCodeNode, symRef), TR::Node::create(originatingByteCodeNode, TR::aconst, 0, 0), newCallBlock->getEntry());
+   TR::Node* nullCheckNode = TR::Node::createif(TR::ifacmpeq, node->duplicateTree(), TR::Node::create(node, TR::aconst, 0, 0), newCallBlock->getEntry());
    nullCheckBlock->append(TR::TreeTop::create(comp, nullCheckNode));
    cfg->addEdge(nullCheckBlock, newCallBlock);
 
@@ -2694,19 +2694,19 @@ TR::Block* J9::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOf
       {
       TR::Block* arrayCheckBlock = callBlock->split(callBlock->getExit(), cfg);
 
-      TR::Node *vftLoad = TR::Node::createWithSymRef(TR::aloadi, 1, 1, TR::Node::createLoad(originatingByteCodeNode, symRef), comp->getSymRefTab()->findOrCreateVftSymbolRef());
+      TR::Node *vftLoad = TR::Node::createWithSymRef(TR::aloadi, 1, 1, node->duplicateTree(), comp->getSymRefTab()->findOrCreateVftSymbolRef());
       TR::Node *isArrayField = TR::Node::createWithSymRef(TR::lloadi, 1, 1, vftLoad, comp->getSymRefTab()->findOrCreateClassAndDepthFlagsSymbolRef());
       isArrayField = TR::Node::create(TR::l2i, 1, isArrayField);
       TR::Node *andConstNode = TR::Node::create(isArrayField, TR::iconst, 0, TR::Compiler->cls.flagValueForArrayCheck(comp));
       TR::Node *andNode = TR::Node::create(TR::iand, 2, isArrayField, andConstNode);
-      TR::Node *arrayCheckNode = TR::Node::createif(TR::ificmpeq, andNode, TR::Node::create(originatingByteCodeNode, TR::iconst, 0), newCallBlock->getEntry());
+      TR::Node *arrayCheckNode = TR::Node::createif(TR::ificmpeq, andNode, TR::Node::create(node, TR::iconst, 0), newCallBlock->getEntry());
 
       arrayCheckBlock->append(TR::TreeTop::create(comp, arrayCheckNode, NULL, NULL));
       cfg->addEdge(callBlock, newCallBlock);
       }
 
    // Insert adjust trees
-   TR::Node* adjustedNode = TR::TransformUtil::generateDataAddrLoadTrees(comp, TR::Node::createLoad(originatingByteCodeNode, symRef));
+   TR::Node* adjustedNode = TR::TransformUtil::generateDataAddrLoadTrees(comp, node->duplicateTree());
    TR::Node *newStore = TR::Node::createStore(symRef, adjustedNode);
    TR::TreeTop *newStoreTree = TR::TreeTop::create(comp, newStore);
    adjustBlock->append(newStoreTree);
@@ -2753,7 +2753,8 @@ void J9::TransformUtil::transformUnsafeCopyMemorytoArrayCopyForOffHeap(TR::Compi
    // Anchor nodes
    for (int32_t i=1; i < arraycopyNode->getNumChildren(); i++)
       {
-      if (!arraycopyNode->getChild(i)->getOpCode().isLoadConst())
+      TR::Node* childNode = arraycopyNode->getChild(i);
+      if ( !(childNode->getOpCode().isLoadConst() || childNode->getSymbolReference()->getSymbol()->isAutoOrParm()) )
          arrayCopyTT->insertBefore(TR::TreeTop::create(comp, TR::Node::create(TR::treetop, 1, arraycopyNode->getChild(i))));
       }
 
@@ -2767,12 +2768,12 @@ void J9::TransformUtil::transformUnsafeCopyMemorytoArrayCopyForOffHeap(TR::Compi
    if (srcAdjustmentNeeded)
       {
       src->createStoresForVar(adjustSrcTempRef, currentBlock->getExit());
-      callBlock = TR::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOffHeap(comp, adjustSrcTempRef, callBlock, srcArrayCheckNeeded, arraycopyNode, cfg);
+      callBlock = TR::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOffHeap(comp, src, adjustSrcTempRef, callBlock, srcArrayCheckNeeded, arraycopyNode, cfg);
       }
    if (destAdjustmentNeeded)
       {
       dest->createStoresForVar(adjustDestTempRef, currentBlock->getExit());
-      callBlock = TR::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOffHeap(comp, adjustDestTempRef, callBlock, destArrayCheckNeeded, arraycopyNode, cfg);
+      callBlock = TR::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOffHeap(comp, dest, adjustDestTempRef, callBlock, destArrayCheckNeeded, arraycopyNode, cfg);
       }
 
    TR::TransformUtil::convertUnsafeCopyMemoryCallToArrayCopyWithSymRefLoad(comp, arrayCopyTT, adjustSrcTempRef, adjustDestTempRef);
