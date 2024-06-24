@@ -2768,12 +2768,12 @@ void J9::TransformUtil::transformUnsafeCopyMemorytoArrayCopyForOffHeap(TR::Compi
    if (srcAdjustmentNeeded)
       {
       src->createStoresForVar(adjustSrcTempRef, currentBlock->getExit());
-      callBlock = TR::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOffHeap(comp, src, adjustSrcTempRef, callBlock, srcArrayCheckNeeded, arraycopyNode, cfg);
+      callBlock = TR::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOffHeap(comp, src, adjustSrcTempRef, callBlock, srcArrayCheckNeeded, cfg);
       }
    if (destAdjustmentNeeded)
       {
       dest->createStoresForVar(adjustDestTempRef, currentBlock->getExit());
-      callBlock = TR::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOffHeap(comp, dest, adjustDestTempRef, callBlock, destArrayCheckNeeded, arraycopyNode, cfg);
+      callBlock = TR::TransformUtil::insertUnsafeCopyMemoryArgumentChecksAndAdjustForOffHeap(comp, dest, adjustDestTempRef, callBlock, destArrayCheckNeeded, cfg);
       }
 
    TR::TransformUtil::convertUnsafeCopyMemoryCallToArrayCopyWithSymRefLoad(comp, arrayCopyTT, adjustSrcTempRef, adjustDestTempRef);
