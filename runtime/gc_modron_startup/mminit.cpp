@@ -3134,6 +3134,8 @@ gcInitializeDefaults(J9JavaVM* vm)
 
 		/* Try to initialize basic heap structures with the memory parameters we currently have */
 		if (JNI_OK == j9gc_initialize_heap(vm, memoryParameterTable, extensions->memoryMax)) {
+			/* set vm->isVirtualLargeObjectHeapEnabled after extensions->isVirtualLargeObjectHeapEnabled is set in j9gc_initialize_heap(). */
+			vm->isVirtualLargeObjectHeapEnabled = (extensions->isVirtualLargeObjectHeapEnabled) ? TRUE : FALSE;
 			break;
 		}
 
