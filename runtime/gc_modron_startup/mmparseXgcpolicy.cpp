@@ -178,6 +178,7 @@ gcParseXgcpolicy(MM_GCExtensions *extensions)
 					}
 				} else if (0 == strcmp("balanced", policy)) {
 					if (isBalancedGCPolicySupported(extensions) || enableUnsupported) {
+						extensions->isVirtualLargeObjectHeapRequested = true;
 						CONSUME_ARG(vmArgs, xgcpolicyIndex);
 						extensions->configurationOptions._gcPolicy = gc_policy_balanced;
 					}
