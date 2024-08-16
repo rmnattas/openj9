@@ -339,8 +339,13 @@ void J9::RecognizedCallTransformer::process_jdk_internal_util_ArraysSupport_vect
       TR::Node::create(node, TR::lxor, 2, mask, TR::Node::lconst(node, -1)));
 
    TR::Node* mismatchByteIndex = TR::Node::create(node, TR::arraycmplen, 3);
-   // TODO: replace the following aladd's with generateDataAddrLoadTrees when off-heap memory changes come in
-   // See OpenJ9 issue #16717 https://github.com/eclipse-openj9/openj9/issues/16717
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+   if (TR::Compiler->om.isOffHeapAllocationEnabled())
+      {
+      a = TR::TransformUtil::generateDataAddrLoadTrees(comp(), a);
+      b = TR::TransformUtil::generateDataAddrLoadTrees(comp(), b);
+      }
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
    mismatchByteIndex->setAndIncChild(0, TR::Node::create(node, TR::aladd, 2, a, aOffset));
    mismatchByteIndex->setAndIncChild(1, TR::Node::create(node, TR::aladd, 2, b, bOffset));
    mismatchByteIndex->setAndIncChild(2, lengthToCompare);
