@@ -403,7 +403,7 @@ MM_VLHGCAccessBarrier::jniReleaseStringCritical(J9VMThread* vmThread, jstring st
 	if (alwaysCopyInCritical || isCompressed) {
 		freeStringCritical(vmThread, functions, elems);
 	} else if (!indexableObjectModel->isInlineContiguousArraylet(valueObject)) {
-		if (!indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
+		if ((0 != indexableObjectModel->getSizeInElements(valueObject)) && !indexableObjectModel->isVirtualLargeObjectHeapEnabled()) {
 			/* an array having discontiguous extents is another reason to force the critical section to be a copy in case double mapping is desabled */
 			freeStringCritical(vmThread, functions, elems);
 		}
