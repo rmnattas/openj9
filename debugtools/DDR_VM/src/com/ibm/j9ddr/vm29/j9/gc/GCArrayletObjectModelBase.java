@@ -67,7 +67,7 @@ public abstract class GCArrayletObjectModelBase extends GCArrayObjectModel
 		arrayletLeafLogSize = vm.arrayletLeafLogSize();
 		arrayletLeafSizeMask = arrayletLeafSize.sub(1);
 		try {
-			enableVirtualLargeObjectHeap = arrayletObjectModel._enableVirtualLargeObjectHeap();
+			enableVirtualLargeObjectHeap = !vm.isVirtualLargeObjectHeapEnabled().isZero();
 		} catch (NoSuchFieldException e) {
 			enableVirtualLargeObjectHeap = false;
 		}

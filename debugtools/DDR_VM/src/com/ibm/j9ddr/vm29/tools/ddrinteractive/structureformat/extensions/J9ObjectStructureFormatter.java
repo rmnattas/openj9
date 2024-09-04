@@ -164,6 +164,7 @@ public class J9ObjectStructureFormatter extends BaseStructureFormatter
 		out.format("    struct J9Class* clazz = !j9arrayclass 0x%X   // %s%n", localClazz.getAddress(), className);
 		out.format("    Object flags = %s;%n", J9IndexableObjectHelper.flags(localObject).getHexValue());
 
+		/* if IndexableDataAddrPresent in header of ArrayObject, output DataAddr */
 		if (isIndexableDataAddrPresent) {
 			VoidPointer dataAddr = null;
 			try {
