@@ -36,6 +36,7 @@ import com.ibm.j9ddr.vm29.pointer.generated.J9IndexableObjectPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.J9JavaVMPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.J9ROMArrayClassPointer;
 import com.ibm.j9ddr.vm29.pointer.generated.MM_GCExtensionsPointer;
+import com.ibm.j9ddr.vm29.pointer.generated.MM_MemoryHandlePointer;
 import com.ibm.j9ddr.vm29.pointer.helper.J9IndexableObjectHelper;
 import com.ibm.j9ddr.vm29.pointer.helper.J9ObjectHelper;
 import com.ibm.j9ddr.vm29.structure.GC_ArrayletObjectModelBase$ArrayLayout;
@@ -66,8 +67,10 @@ public abstract class GCArrayletObjectModelBase extends GCArrayObjectModel
 		arrayletLeafSize = vm.arrayletLeafSize();
 		arrayletLeafLogSize = vm.arrayletLeafLogSize();
 		arrayletLeafSizeMask = arrayletLeafSize.sub(1);
+		MM_GCExtensionsPointer extensions = GCBase.getExtensions();
+
 		try {
-			enableVirtualLargeObjectHeap = arrayletObjectModel._enableVirtualLargeObjectHeap();
+			enableVirtualLargeObjectHeap = extensions.isVirtualLargeObjectHeapEnabled();
 		} catch (NoSuchFieldException e) {
 			enableVirtualLargeObjectHeap = false;
 		}
@@ -405,8 +408,9 @@ public abstract class GCArrayletObjectModelBase extends GCArrayObjectModel
 		MM_GCExtensionsPointer extensions = GCBase.getExtensions();
 
 		UDATA heapAddr = UDATA.cast(address);
-		UDATA heapBase = UDATA.cast(extensions.cardTable()._heapBase());
-		UDATA heapTop = UDATA.cast(extensions.cardTable()._heapAlloc());
+		MM_MemoryHandlePointer memoryHandle = MM_MemoryHandlePointer.cast(extensions.heap());
+		UDATA heapBase = UDATA.cast(memoryHandle._memoryBase());
+		UDATA heapTop = UDATA.cast(memoryHandle._memoryTop());
 
 		return heapAddr.gte(heapBase) && heapAddr.lte(heapTop);
 	}

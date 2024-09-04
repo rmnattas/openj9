@@ -92,15 +92,8 @@ class GCArrayletObjectModel_V2 extends GCArrayletObjectModelBase
 			} else if (dataSizeInBytes.lt(arrayletLeafSize)) {
 				VoidPointer contiguousDataAddr = VoidPointer.cast(arrayPtr.addOffset(J9IndexableObjectHelper.contiguousHeaderSize()));
 				hasCorrectDataAddrPointer = dataAddr.equals(contiguousDataAddr);
-				if (!hasCorrectDataAddrPointer && !enableVirtualLargeObjectHeap) {
-					hasCorrectDataAddrPointer = dataAddr.isNull();
-				}
 			} else {
-				if (enableVirtualLargeObjectHeap) {
-					hasCorrectDataAddrPointer = isValidDataAddrForOffHeapObject;
-				} else {
-					hasCorrectDataAddrPointer = dataAddr.isNull();
-				}
+				hasCorrectDataAddrPointer = isValidDataAddrForOffHeapObject;
 			}
 		} catch (NoSuchFieldException e) {
 			hasCorrectDataAddrPointer = true;

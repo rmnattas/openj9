@@ -164,6 +164,15 @@ public class J9ObjectStructureFormatter extends BaseStructureFormatter
 		out.format("    struct J9Class* clazz = !j9arrayclass 0x%X   // %s%n", localClazz.getAddress(), className);
 		out.format("    Object flags = %s;%n", J9IndexableObjectHelper.flags(localObject).getHexValue());
 
+		U32 size = J9IndexableObjectHelper.size(localObject);
+
+		if (size.anyBitsIn(0x80000000)) {
+			out.format("    U_32 size = %s; // Size exceeds Integer.MAX_VALUE!%n", size.getHexValue());
+		} else {
+			out.format("    U_32 size = %s;%n", size.getHexValue());
+		}
+
+		/* if IndexableDataAddrPresent in header of ArrayObject, output DataAddr */
 		if (isIndexableDataAddrPresent) {
 			VoidPointer dataAddr = null;
 			try {
@@ -175,14 +184,6 @@ public class J9ObjectStructureFormatter extends BaseStructureFormatter
 				dataAddr = null;
 			}
 			out.format("    U_64 DataAddr = %s, %n", (dataAddr == null)? "NULL" : dataAddr.getHexAddress());
-		}
-
-		U32 size = J9IndexableObjectHelper.size(localObject);
-
-		if (size.anyBitsIn(0x80000000)) {
-			out.format("    U_32 size = %s; // Size exceeds Integer.MAX_VALUE!%n", size.getHexValue());
-		} else {
-			out.format("    U_32 size = %s;%n", size.getHexValue());
 		}
 
 		printSubArrayType(out, 1, localClazz, dataStart, begin, end, localObject);
