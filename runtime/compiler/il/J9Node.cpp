@@ -283,7 +283,7 @@ J9::Node::processJNICall(TR::TreeTop *callNodeTreeTop, TR::ResolvedMethodSymbol 
         comp->fej9()->isAnyMethodTracingEnabled(resolvedMethod->getPersistentIdentifier())))
       return self();
 
-   if (!comp->getOption(TR_DisableUnsafe) && !TR::Compiler->om.canGenerateArraylets() &&
+   if (!comp->getOption(TR_DisableUnsafe) && (feGetEnv("AA_4") != NULL) && !TR::Compiler->om.canGenerateArraylets() &&
        (methodSymbol->getRecognizedMethod() == TR::java_nio_Bits_copyToByteArray ||
         methodSymbol->getRecognizedMethod() == TR::java_nio_Bits_copyFromByteArray))
       return self();

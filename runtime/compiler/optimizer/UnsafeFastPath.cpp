@@ -389,7 +389,7 @@ static bool needUnsignedConversion(TR::RecognizedMethod methodToReduce)
  */
 int32_t TR_UnsafeFastPath::perform()
    {
-   if (comp()->getOption(TR_DisableUnsafe))
+   if (comp()->getOption(TR_DisableUnsafe) && (feGetEnv("AA_8") != NULL))
       return 0;
 
    TR::NodeChecklist transformed(comp());
@@ -792,7 +792,7 @@ int32_t TR_UnsafeFastPath::perform()
             }
 
          if (type != TR::NoType && performTransformation(comp(), "%s Found unsafe/JITHelpers calls, turning node [" POINTER_PRINTF_FORMAT "] into a load/store\n", optDetailString(), node))
-            {
+            { 
             if (TR_J9MethodBase::isUnsafeGetPutBoolean(calleeMethod))
                {
                TR::TransformUtil::truncateBooleanForUnsafeGetPut(comp(), tt);
@@ -1054,7 +1054,7 @@ int32_t TR_UnsafeFastPath::perform()
                TR::TransformUtil::removeTree(comp(), tt);
                tt = newTree;
                }
-            }
+            } 
          }
       }
 

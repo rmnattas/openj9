@@ -2435,7 +2435,7 @@ TR_J9InlinerPolicy::inlineUnsafeCall(TR::ResolvedMethodSymbol *calleeSymbol, TR:
    {
    debugTrace(tracer(), "Unsafe Inlining: Trying to inline Unsafe Call at Node %p\n", callNode);
 
-   if (comp()->getOption(TR_DisableUnsafe))
+   if (comp()->getOption(TR_DisableUnsafe) && (feGetEnv("AA_5") != NULL))
       return false;
 
    if (!callNode->getSymbol()->isResolvedMethod())
@@ -2665,7 +2665,7 @@ TR_J9InlinerPolicy::isInlineableJNI(TR_ResolvedMethod *method,TR::Node *callNode
 
    // Unsafe's JNIs
    //
-   if (comp->getOption(TR_DisableUnsafe))
+   if (comp->getOption(TR_DisableUnsafe) && (feGetEnv("AA_6") != NULL))
       return false;
 
    // If this put ordered call node has already been inlined, do not inline it again (JTC-JAT 71313)

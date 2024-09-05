@@ -933,6 +933,7 @@ J9::CodeGenerator::lowerTreeIfNeeded(
 
    // J9
    if (!self()->comp()->getOption(TR_DisableUnsafe) &&
+   (feGetEnv("AA_3") != NULL) &&
        node->getOpCode().isCall() &&
        node->getOpCodeValue() == TR::call &&
        !TR::Compiler->om.canGenerateArraylets() &&
