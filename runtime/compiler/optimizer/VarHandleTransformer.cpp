@@ -263,6 +263,16 @@ int32_t TR_VarHandleTransformer::perform()
                 callTree->insertBefore(TR::TreeTop::create(comp(), TR::Node::create(node, TR::treetop, 1, handleTable)));
 
              TR::Node *methodHandleAddr = J9::TransformUtil::calculateElementAddress(comp(), handleTable, index, TR::Address);
+#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+            // Given that calculateElementAddress() does not add headerSize for offHeap we add it here
+            // to access the C array VarHandleMethods.
+            if (TR::Compiler->om.isOffHeapAllocationEnabled())
+               {
+               TR::Node *headerSizeNode = TR::Node::create(comp()->target().is64Bit() ? TR::lconst : TR::iconst, 0);
+               headerSizeNode->setConstValue(TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+               methodHandleAddr = TR::Node::create(comp()->target().is64Bit() ? TR::ladd : TR::iadd, 2, methodHandleAddr, headerSizeNode);
+               }
+#endif /* J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION */
              TR::Node *methodHandle = TR::Node::createWithSymRef(comp()->il.opCodeForIndirectArrayLoad(TR::Address), 1, 1, methodHandleAddr, comp()->getSymRefTab()->findOrCreateArrayShadowSymbolRef(TR::Address, handleTable));
              methodHandle->copyByteCodeInfo(node);
 
