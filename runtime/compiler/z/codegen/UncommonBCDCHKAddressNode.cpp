@@ -62,17 +62,44 @@ UncommonBCDCHKAddressNode::perform()
             {
             TR::Node* pdOpNode = node->getFirstChild();
             TR::Node* oldAddressNode = node->getSecondChild();
-            TR_ASSERT(pdOpNode && oldAddressNode, "Unexpected null PD opNode or address node under BCDCHK");
-            TR_ASSERT(oldAddressNode->getNumChildren() == 2, "Expecting 2 children under address node of BCDCHK.");
+            TR_ASSERT_FATAL_WITH_NODE(node, pdOpNode && oldAddressNode, "Unexpected null PD opNode or address node under BCDCHK");
 
             TR::ILOpCodes addressOp = oldAddressNode->getOpCodeValue();
-            TR_ASSERT((addressOp == TR::aladd || addressOp == TR::aiadd), "Unexpected addressNode opcode");
+            TR_ASSERT_FATAL_WITH_NODE(node,
+                                      oldAddressNode->isDataAddrPointer() && oldAddressNode->getNumChildren() == 1
+                                          || ((addressOp == TR::aladd || addressOp == TR::aiadd) && oldAddressNode->getNumChildren() == 2),
+                                      "Expecting either a dataAddrPointer node with 1 child or a aladd/aiadd with 2 children under address node of BCDCHK.");
 
             if(oldAddressNode->getReferenceCount() > 1)
                {
-               TR::Node* newAddressNode = TR::Node::create(node, addressOp, 2,
-                                                           oldAddressNode->getFirstChild(),
-                                                           oldAddressNode->getSecondChild());
+               TR::Node* newAddressNode = NULL;
+               if (oldAddressNode->getOpCodeValue() == TR::aloadi)
+                  {
+                  /* Expected tree structure (probably just loading first array element because offset is 0)
+                   *     aloadi <contiguousArrayDataAddrFieldSymbol>
+                   *         load array_object
+                   */
+                  newAddressNode = TR::TransformUtil::generateArrayElementAddressTrees(comp(), oldAddressNode->getFirstChild());
+                  }
+               else
+                  {
+                  /* Expected tree structures
+                   * 1. non off-heap mode
+                   *     aladd/aiadd
+                   *         load array_object
+                   *         array_element_offset
+                   *
+                   * 2. off-heap enabled
+                   *     aladd/aiadd
+                   *         aloadi <contiguousArrayDataAddrFieldSymbol>
+                   *             load array_object
+                   *         array_element_offset
+                   */
+                  newAddressNode = TR::Node::create(node, addressOp, 2,
+                                                    oldAddressNode->getFirstChild(),
+                                                    oldAddressNode->getSecondChild());
+                  }
+
                node->setAndIncChild(1, newAddressNode);
                oldAddressNode->decReferenceCount();
                traceMsg(comp(), "%sReplacing node %s [%p] with [%p]\n",
