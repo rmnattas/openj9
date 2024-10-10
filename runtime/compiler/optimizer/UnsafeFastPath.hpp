@@ -42,6 +42,6 @@ class TR_UnsafeFastPath : public TR::Optimization
 
    virtual int32_t perform();
    virtual const char * optDetailString() const throw();
-   bool tryTransformUnsafeAtomicCallInVarHandleAccessMethod(TR::TreeTop* callTree, TR::RecognizedMethod callerMethod, TR::RecognizedMethod calleeMethod);
+   bool tryTransformUnsafeAtomicCallInVarHandleAccessMethod(TR::TreeTop* callTree, TR::RecognizedMethod callerMethod, TR::RecognizedMethod calleeMethod, bool isArrayOperation);
    };
 #endif
