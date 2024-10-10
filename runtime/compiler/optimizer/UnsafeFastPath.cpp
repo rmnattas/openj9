@@ -253,7 +253,7 @@ static bool isVarHandleOperationMethodOnNonStaticField(TR::RecognizedMethod rm)
  * \return True if the call is transformed, otherwise false
  *
  */
-bool TR_UnsafeFastPath::tryTransformUnsafeAtomicCallInVarHandleAccessMethod(TR::TreeTop* callTree, TR::RecognizedMethod callerMethod, TR::RecognizedMethod calleeMethod)
+bool TR_UnsafeFastPath::tryTransformUnsafeAtomicCallInVarHandleAccessMethod(TR::TreeTop* callTree, TR::RecognizedMethod callerMethod, TR::RecognizedMethod calleeMethod, bool isArrayOperation)
    {
    TR::Node* node = callTree->getNode()->getFirstChild();
 
@@ -414,6 +414,57 @@ int32_t TR_UnsafeFastPath::perform()
          TR::SymbolReference *symRef = node->getSymbolReference();
          TR::MethodSymbol *symbol = node->getSymbol()->castToMethodSymbol();
 
+         // Check for array operation
+         bool isArrayOperation = false;
+
+         switch (symbol->getRecognizedMethod())
+            {
+            case TR::sun_misc_Unsafe_putObjectVolatile_jlObjectJjlObject_V:
+            case TR::sun_misc_Unsafe_putObject_jlObjectJjlObject_V:
+            case TR::sun_misc_Unsafe_getObjectVolatile_jlObjectJ_jlObject:
+            case TR::sun_misc_Unsafe_getObject_jlObjectJ_jlObject:
+               switch (methodSymbol->getRecognizedMethod())
+                  {
+                  case TR::java_util_concurrent_ConcurrentHashMap_tabAt:
+                  case TR::java_util_concurrent_ConcurrentHashMap_setTabAt:
+                     isArrayOperation = true;
+                     break;
+                  default:
+                     break;
+                  }
+               break;
+            case TR::com_ibm_jit_JITHelpers_getByteFromArrayVolatile:
+            case TR::com_ibm_jit_JITHelpers_getByteFromArrayByIndex:
+            case TR::com_ibm_jit_JITHelpers_getByteFromArray:
+            case TR::com_ibm_jit_JITHelpers_getCharFromArrayVolatile:
+            case TR::com_ibm_jit_JITHelpers_getCharFromArrayByIndex:
+            case TR::com_ibm_jit_JITHelpers_getCharFromArray:
+            case TR::com_ibm_jit_JITHelpers_getIntFromArrayVolatile:
+            case TR::com_ibm_jit_JITHelpers_getIntFromArray:
+            case TR::com_ibm_jit_JITHelpers_getLongFromArrayVolatile:
+            case TR::com_ibm_jit_JITHelpers_getLongFromArray:
+            case TR::com_ibm_jit_JITHelpers_getObjectFromArrayVolatile:
+            case TR::com_ibm_jit_JITHelpers_getObjectFromArray:
+            case TR::com_ibm_jit_JITHelpers_putByteInArrayVolatile:
+            case TR::com_ibm_jit_JITHelpers_putByteInArrayByIndex:
+            case TR::com_ibm_jit_JITHelpers_putByteInArray:
+            case TR::com_ibm_jit_JITHelpers_putCharInArrayVolatile:
+            case TR::com_ibm_jit_JITHelpers_putCharInArrayByIndex:
+            case TR::com_ibm_jit_JITHelpers_putCharInArray:
+            case TR::com_ibm_jit_JITHelpers_putIntInArrayVolatile:
+            case TR::com_ibm_jit_JITHelpers_putIntInArray:
+            case TR::com_ibm_jit_JITHelpers_putLongInArrayVolatile:
+            case TR::com_ibm_jit_JITHelpers_putLongInArray:
+            case TR::com_ibm_jit_JITHelpers_putObjectInArrayVolatile:
+            case TR::com_ibm_jit_JITHelpers_putObjectInArray:
+            case TR::java_lang_StringUTF16_getChar:
+            case TR::java_lang_StringUTF16_putChar:
+               isArrayOperation = true;
+               break;
+            default:
+               break;
+            }
+
          if (!transformed.contains(node))
             {
             TR::RecognizedMethod caller = getVarHandleAccessMethodFromInlinedCallStack(comp(), node);
@@ -426,7 +477,7 @@ int32_t TR_UnsafeFastPath::perform()
                 (isTransformableUnsafeAtomic(comp(), callee) ||
                  symbol->getMethod()->isUnsafeCAS(comp())))
                {
-               if (tryTransformUnsafeAtomicCallInVarHandleAccessMethod(tt, caller, callee))
+               if (tryTransformUnsafeAtomicCallInVarHandleAccessMethod(tt, caller, callee, isArrayOperation))
                   {
                   transformed.add(node);
                   continue;
@@ -546,7 +597,6 @@ int32_t TR_UnsafeFastPath::perform()
          TR::Node *base = NULL; // the base used to calcluate address for the new store / load
          TR::DataType type = TR::NoType;
          bool isVolatile = false;
-         bool isArrayOperation = false;
          bool isByIndex = false;
          int32_t objectChild = 1;
          int32_t offsetChild = 2;
@@ -559,55 +609,6 @@ int32_t TR_UnsafeFastPath::perform()
                offsetChild = 1;
                break;
 
-            default:
-               break;
-            }
-
-         // Check for array operation
-         switch (symbol->getRecognizedMethod())
-            {
-            case TR::sun_misc_Unsafe_putObjectVolatile_jlObjectJjlObject_V:
-            case TR::sun_misc_Unsafe_putObject_jlObjectJjlObject_V:
-            case TR::sun_misc_Unsafe_getObjectVolatile_jlObjectJ_jlObject:
-            case TR::sun_misc_Unsafe_getObject_jlObjectJ_jlObject:
-               switch (methodSymbol->getRecognizedMethod())
-                  {
-                  case TR::java_util_concurrent_ConcurrentHashMap_tabAt:
-                  case TR::java_util_concurrent_ConcurrentHashMap_setTabAt:
-                     isArrayOperation = true;
-                     break;
-                  default:
-                     break;
-                  }
-               break;
-            case TR::com_ibm_jit_JITHelpers_getByteFromArrayVolatile:
-            case TR::com_ibm_jit_JITHelpers_getByteFromArrayByIndex:
-            case TR::com_ibm_jit_JITHelpers_getByteFromArray:
-            case TR::com_ibm_jit_JITHelpers_getCharFromArrayVolatile:
-            case TR::com_ibm_jit_JITHelpers_getCharFromArrayByIndex:
-            case TR::com_ibm_jit_JITHelpers_getCharFromArray:
-            case TR::com_ibm_jit_JITHelpers_getIntFromArrayVolatile:
-            case TR::com_ibm_jit_JITHelpers_getIntFromArray:
-            case TR::com_ibm_jit_JITHelpers_getLongFromArrayVolatile:
-            case TR::com_ibm_jit_JITHelpers_getLongFromArray:
-            case TR::com_ibm_jit_JITHelpers_getObjectFromArrayVolatile:
-            case TR::com_ibm_jit_JITHelpers_getObjectFromArray:
-            case TR::com_ibm_jit_JITHelpers_putByteInArrayVolatile:
-            case TR::com_ibm_jit_JITHelpers_putByteInArrayByIndex:
-            case TR::com_ibm_jit_JITHelpers_putByteInArray:
-            case TR::com_ibm_jit_JITHelpers_putCharInArrayVolatile:
-            case TR::com_ibm_jit_JITHelpers_putCharInArrayByIndex:
-            case TR::com_ibm_jit_JITHelpers_putCharInArray:
-            case TR::com_ibm_jit_JITHelpers_putIntInArrayVolatile:
-            case TR::com_ibm_jit_JITHelpers_putIntInArray:
-            case TR::com_ibm_jit_JITHelpers_putLongInArrayVolatile:
-            case TR::com_ibm_jit_JITHelpers_putLongInArray:
-            case TR::com_ibm_jit_JITHelpers_putObjectInArrayVolatile:
-            case TR::com_ibm_jit_JITHelpers_putObjectInArray:
-            case TR::java_lang_StringUTF16_getChar:
-            case TR::java_lang_StringUTF16_putChar:
-               isArrayOperation = true;
-               break;
             default:
                break;
             }
