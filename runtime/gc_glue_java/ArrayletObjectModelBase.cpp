@@ -37,9 +37,9 @@ GC_ArrayletObjectModelBase::initialize(MM_GCExtensionsBase *extensions)
 	_enableDoubleMapping = false;
 #endif /* J9VM_GC_ENABLE_DOUBLE_MAP */
 	_largestDesirableArraySpineSize = UDATA_MAX;
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	_enableVirtualLargeObjectHeap = false;
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 #if defined(J9VM_ENV_DATA64)
 	_isIndexableDataAddrPresent = false;
 #endif /* defined(J9VM_ENV_DATA64) */

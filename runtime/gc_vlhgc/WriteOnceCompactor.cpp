@@ -1663,11 +1663,11 @@ public:
 		scanJVMTIObjectTagTables(env);
 #endif /* J9VM_OPT_JVMTI */
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	if (_includeVirtualLargeObjectHeap) {
 		scanObjectsInVirtualLargeObjectHeap(env);
 	}
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 	}
 	

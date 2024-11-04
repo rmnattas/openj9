@@ -91,9 +91,9 @@ protected:
 #endif /* J9VM_GC_MODRON_SCAVENGER */	 	
 	bool _classDataAsRoots; /**< Should all classes (and class loaders) be treated as roots. Default true, should set to false when class unloading */
 	bool _includeJVMTIObjectTagTables; /**< Should the iterator include the JVMTIObjectTagTables. Default true, should set to false when doing JVMTI object walks */
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	bool _includeVirtualLargeObjectHeap; /**< Enables scanning of objects that has been allocated at sparse heap. Default is false */
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 	bool _trackVisibleStackFrameDepth; /**< Should the stack walker be told to track the visible frame depth. Default false, should set to true when doing JVMTI walks that report stack slots */
 
 	U_64 _entityStartScanTime; /**< The start time of the scan of the current scanning entity, or 0 if no entity is being scanned.  Defaults to 0. */
@@ -316,9 +316,9 @@ public:
 #endif /* J9VM_GC_MODRON_SCAVENGER */
 		, _classDataAsRoots(true)
 		, _includeJVMTIObjectTagTables(true)
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 		, _includeVirtualLargeObjectHeap(_extensions->indexableObjectModel.isVirtualLargeObjectHeapEnabled())
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 		, _trackVisibleStackFrameDepth(false)
 		, _entityStartScanTime(0)
 		, _entityIncrementStartTime(0)
@@ -467,7 +467,7 @@ public:
 	void scanJVMTIObjectTagTables(MM_EnvironmentBase *env);
 #endif /* J9VM_OPT_JVMTI */
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	/**
 	 * Scans each heap region for arraylet leaves that contains a non-NULL
 	 * contiguous address due to off-heap allocation. This address points to the contiguous representation
@@ -478,7 +478,7 @@ public:
 	 * @param env thread GC Environment
 	 */
 	void scanObjectsInVirtualLargeObjectHeap(MM_EnvironmentBase *env);
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 	virtual void doClassLoader(J9ClassLoader *classLoader);
 
@@ -541,7 +541,7 @@ public:
 	virtual void doVMClassSlot(J9Class *classPtr);
 	virtual void doVMThreadSlot(J9Object **slotPtr, GC_VMThreadIterator *vmThreadIterator);
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	/**
 	 * Frees the region used for off-heap allocation associated to the objectPtr (arraylet spine) if the objectPtr
 	 * is not live.
@@ -549,7 +549,7 @@ public:
 	 * @param objectPtr[in] indexable object's spine
 	 */
 	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, bool *sparseHeapAllocation);
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 	
 	/**
 	 * Called for each object stack slot. Subclasses may override.

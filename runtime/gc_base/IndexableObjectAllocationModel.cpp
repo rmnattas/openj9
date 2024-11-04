@@ -25,13 +25,13 @@
 #include "IndexableObjectAllocationModel.hpp"
 #include "Math.hpp"
 #include "MemorySpace.hpp"
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 #include "ArrayletLeafIterator.hpp"
 #include "HeapRegionManager.hpp"
 #include "HeapRegionDescriptorVLHGC.hpp"
 #include "Heap.hpp"
 #include "SparseVirtualMemory.hpp"
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 /**
  * Allocation description and layout initialization. This is called before OMR allocates
@@ -181,7 +181,7 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 	/* Lay out arraylet and arrayoid pointers */
 	switch (_layout) {
 	case GC_ArrayletObjectModel::InlineContiguous:
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 		if (isVirtualLargeObjectHeapEnabled && !isDataAdjacentToHeader) {
 			/* We still need to create leaves for discontiguous arrays that will be allocated at off-heap. */
 			spine = getSparseAddressAndDecommitLeaves(env, spine);
@@ -189,7 +189,7 @@ MM_IndexableObjectAllocationModel::initializeIndexableObject(MM_EnvironmentBase 
 				Assert_MM_true(1 <= _numberOfArraylets);
 			}
 		}
-#endif /* defined (J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined (J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 		if (!isVirtualLargeObjectHeapEnabled || isDataAdjacentToHeader) {
 			Assert_MM_true(1 == _numberOfArraylets);
 		}
@@ -320,7 +320,7 @@ MM_IndexableObjectAllocationModel::layoutDiscontiguousArraylet(MM_EnvironmentBas
 	return spine;
 }
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 MMINLINE J9IndexableObject *
 MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_EnvironmentBase *env, J9IndexableObject *spine)
 {
@@ -395,4 +395,4 @@ MM_IndexableObjectAllocationModel::getSparseAddressAndDecommitLeaves(MM_Environm
 
 	return spine;
 }
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */

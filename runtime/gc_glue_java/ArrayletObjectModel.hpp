@@ -1163,11 +1163,11 @@ public:
 	getDataPointerForContiguous(J9IndexableObject *arrayPtr)
 	{
 		void *dataAddr = (void *)((uintptr_t)arrayPtr + contiguousIndexableHeaderSize());
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 		if (isVirtualLargeObjectHeapEnabled()) {
 			dataAddr = *dataAddrSlotForContiguous(arrayPtr);
 		}
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 		return dataAddr;
 	}
 

@@ -82,7 +82,7 @@ private:
 	 */
 	MMINLINE J9IndexableObject *layoutDiscontiguousArraylet(MM_EnvironmentBase *env, J9IndexableObject *spine);
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	/**
 	 * For discontiguous arraylet that will be allocated to sparse heap (off-heap). Even though this arraylet is large enough to be
 	 * discontiguous, its true layout is InlineContiguous. Arraylet leaves still need to be created and initialized,
@@ -94,7 +94,7 @@ private:
 	 * @return initialized arraylet spine with its arraylet pointers initialized
 	 */
 	MMINLINE J9IndexableObject *getSparseAddressAndDecommitLeaves(MM_EnvironmentBase *env, J9IndexableObject *spine);
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 protected:
 

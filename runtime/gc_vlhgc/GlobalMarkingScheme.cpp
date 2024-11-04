@@ -78,9 +78,9 @@
 #include "RegionBasedOverflowVLHGC.hpp"
 #include "RootScanner.hpp"
 #include "SegmentIterator.hpp"
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 #include "SparseVirtualMemory.hpp"
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 #include "StackSlotValidator.hpp"
 #include "SublistIterator.hpp"
 #include "SublistPool.hpp"
@@ -1374,7 +1374,7 @@ private:
 		}
 	}
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, bool *sparseHeapAllocation) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
 		env->_markVLHGCStats._offHeapRegionCandidates += 1;
@@ -1387,7 +1387,7 @@ private:
 			}
 		}
 	}
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 	/**
 	 * @Clear the string table cache slot if the object is not marked

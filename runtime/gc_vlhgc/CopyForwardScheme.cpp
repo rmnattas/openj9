@@ -92,9 +92,9 @@
 #include "RegionBasedOverflowVLHGC.hpp"
 #include "RootScanner.hpp"
 #include "SlotObject.hpp"
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 #include "SparseVirtualMemory.hpp"
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 #include "StackSlotValidator.hpp"
 #include "SublistFragment.hpp"
 #include "SublistIterator.hpp"
@@ -2029,7 +2029,7 @@ MM_CopyForwardScheme::copy(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *
 
 				if (objectModel->isIndexable(destinationObjectPtr)) {
 					indexableObjectModel->fixupInternalLeafPointersAfterCopy((J9IndexableObject *)destinationObjectPtr, (J9IndexableObject *)forwardedHeader->getObject());
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 					/**
 					 * Update the dataAddr internal field of the indexable object. The field being updated
 					 * points to the array data. In the case of contiguous data, it will point to the data
@@ -2038,7 +2038,7 @@ MM_CopyForwardScheme::copy(MM_EnvironmentVLHGC *env, MM_AllocationContextTarok *
 					if (_extensions->isVirtualLargeObjectHeapEnabled) {
 						indexableObjectModel->fixupDataAddr(forwardedHeader, (J9IndexableObject *)destinationObjectPtr);
 					}
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 				}
 
 				objectModel->fixupHashFlagsAndSlot(forwardedHeader, destinationObjectPtr);
@@ -4077,7 +4077,7 @@ private:
 		}
 	}
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	virtual void doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, bool *sparseHeapAllocation) {
 		MM_EnvironmentVLHGC *env = MM_EnvironmentVLHGC::getEnvironment(_env);
 		env->_copyForwardStats._offHeapRegionCandidates += 1;
@@ -4107,7 +4107,7 @@ private:
 			}
 		}
 	}
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 	/**
 	 * @Clear the string table cache slot if the object is not marked

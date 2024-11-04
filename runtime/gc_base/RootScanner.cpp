@@ -239,13 +239,13 @@ MM_RootScanner::doStringTableSlot(J9Object **slotPtr, GC_StringTableIterator *st
 	doSlot(slotPtr);
 }
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 void
 MM_RootScanner::doObjectInVirtualLargeObjectHeap(J9Object *objectPtr, bool *sparseHeapAllocation)
 {
 	/* No need to call doSlot() here since there's nothing to update */
 }
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 /**
  * @Perform operation on the given string cache table slot.
@@ -912,7 +912,7 @@ MM_RootScanner::scanJVMTIObjectTagTables(MM_EnvironmentBase *env)
 }
 #endif /* J9VM_OPT_JVMTI */
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 void
 MM_RootScanner::scanObjectsInVirtualLargeObjectHeap(MM_EnvironmentBase *env)
 {
@@ -932,7 +932,7 @@ MM_RootScanner::scanObjectsInVirtualLargeObjectHeap(MM_EnvironmentBase *env)
 		reportScanningEnded(RootScannerEntity_virtualLargeObjectHeapObjects);
 	}
 }
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 /**
  * Scan all root set references from the VM into the heap.
@@ -1071,11 +1071,11 @@ MM_RootScanner::scanClearable(MM_EnvironmentBase *env)
 	}
 #endif /* J9VM_OPT_JVMTI */
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	if (_includeVirtualLargeObjectHeap) {
 		scanObjectsInVirtualLargeObjectHeap(env);
 	}
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 }
 
 /**
@@ -1125,11 +1125,11 @@ MM_RootScanner::scanAllSlots(MM_EnvironmentBase *env)
 	}
 #endif /* J9VM_OPT_JVMTI */
 
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 	if (_includeVirtualLargeObjectHeap) {
 		scanObjectsInVirtualLargeObjectHeap(env);
 	}
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 
 	scanOwnableSynchronizerObjects(env);
 	scanContinuationObjects(env);

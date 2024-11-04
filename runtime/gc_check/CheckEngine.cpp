@@ -52,10 +52,10 @@
 #include "ObjectModel.hpp"
 #include "ObjectAccessBarrier.hpp"
 #include "ScanFormatter.hpp"
-#if defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION)
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
 #include "SparseAddressOrderedFixedSizeDataPool.hpp"
 #include "SparseVirtualMemory.hpp"
-#endif /* defined(J9VM_GC_ENABLE_SPARSE_HEAP_ALLOCATION) */
+#endif /* defined(J9VM_GC_SPARSE_HEAP_ALLOCATION) */
 #include "SublistPool.hpp"
 #include "SublistPuddle.hpp"
 
