@@ -353,6 +353,14 @@ j9gc_objaccess_getArrayObjectDataAddress(J9VMThread *vmThread, J9IndexableObject
 	return barrier->getArrayObjectDataAddress(vmThread, arrayObject);
 }
 
+U_8 *
+j9gc_objaccess_contiguousIndexableHeaderSize(J9VMThread *vmThread, J9IndexableObject *arrayObject)
+{
+	contiguousIndexableHeaderSize
+	MM_ObjectAccessBarrier *barrier = MM_GCExtensions::getExtensions(vmThread)->accessBarrier;
+	return barrier->contiguousIndexableHeaderSize(vmThread, arrayObject);
+}
+
 j9objectmonitor_t *
 j9gc_objaccess_getLockwordAddress(J9VMThread *vmThread, J9Object *object)
 {

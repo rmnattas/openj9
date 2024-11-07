@@ -1460,6 +1460,12 @@ MM_ObjectAccessBarrier::getArrayObjectDataAddress(J9VMThread *vmThread, J9Indexa
 	 }
 }
 
+ U_8 *
+MM_ObjectAccessBarrier::contiguousIndexableHeaderSize(J9VMThread *vmThread, J9IndexableObject *arrayObject)
+{
+	return (U_8 *)_extensions->indexableObjectModel.contiguousIndexableHeaderSize(arrayObject);
+}
+
 /**
  * Return the address of the lockword for the given object, or NULL if it 
  * does not have an inline lockword.

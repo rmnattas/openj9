@@ -1404,8 +1404,8 @@ void walkJITFrameSlotsForInternalPointers(J9StackWalkState * walkState,  U_8 ** 
       J9Object *oldPinningArrayAddress = *((J9Object **) currPinningArrayCursor);
       J9Object * newPinningArrayAddress;
       void *oldDataAddr = 0, *newDataAddr = 0;
-      if (offHeapAllocationEnabled && oldPinningArrayAddress)
-         oldDataAddr = walkState->walkThread->javaVM->memoryManagerFunctions->j9gc_objaccess_getArrayObjectDataAddress(walkState->walkThread, (J9IndexableObject*)oldPinningArrayAddress);
+      // if (offHeapAllocationEnabled && oldPinningArrayAddress)
+      //    oldDataAddr = walkState->walkThread->javaVM->memoryManagerFunctions->j9gc_objaccess_getArrayObjectDataAddress(walkState->walkThread, (J9IndexableObject*)oldPinningArrayAddress);
       IDATA displacement = 0;
 
 
@@ -1416,8 +1416,12 @@ void walkJITFrameSlotsForInternalPointers(J9StackWalkState * walkState,  U_8 ** 
       newPinningArrayAddress = *((J9Object **) currPinningArrayCursor);
       if (offHeapAllocationEnabled && newPinningArrayAddress)
          {
+         I_16 objSize = walkState->walkThread->javaVM->memoryManagerFunctions->j9gc_objaccess_contiguousIndexableHeaderSize(walkState->walkThread, (J9IndexableObject*)newPinningArrayAddress);
          newDataAddr = walkState->walkThread->javaVM->memoryManagerFunctions->j9gc_objaccess_getArrayObjectDataAddress(walkState->walkThread, (J9IndexableObject*)newPinningArrayAddress);
-         displacement = (IDATA) (((UDATA)newDataAddr) - ((UDATA)oldDataAddr));
+         if (newDataAddr == (newPinningArrayAddress + objSize))
+            displacement = (IDATA) (((UDATA)newPinningArrayAddress) - ((UDATA)oldPinningArrayAddress));
+         else
+            displacement = 0;
          }
       else
          displacement = (IDATA) (((UDATA)newPinningArrayAddress) - ((UDATA)oldPinningArrayAddress));
