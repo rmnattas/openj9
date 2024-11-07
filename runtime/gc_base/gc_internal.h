@@ -187,6 +187,7 @@ extern J9_CFUNC void j9gc_objaccess_indexableStoreU8(J9VMThread *vmThread, J9Ind
 extern J9_CFUNC void j9gc_objaccess_staticStoreU64(J9VMThread *vmThread, J9Class *clazz, U_64 *destSlot, U_64 value, UDATA isVolatile);
 extern J9_CFUNC IDATA j9gc_objaccess_arrayObjectDataDisplacement(J9VMThread *vmThread,  J9IndexableObject *src,  J9IndexableObject *dst);
 extern J9_CFUNC U_8* j9gc_objaccess_getArrayObjectDataAddress(J9VMThread *vmThread, J9IndexableObject *arrayObject);
+extern J9_CFUNC I_16 j9gc_objaccess_contiguousIndexableHeaderSize(J9VMThread *vmThread, J9IndexableObject *arrayObject);
 extern J9_CFUNC jvmtiIterationControl j9mm_iterate_spaces(J9JavaVM *vm, J9PortLibrary *portLibrary, struct J9MM_IterateHeapDescriptor *heap, UDATA flags, jvmtiIterationControl(*func)(J9JavaVM *vm, struct J9MM_IterateSpaceDescriptor *spaceDesc, void *userData), void *userData);
 extern J9_CFUNC void memoryManagerTLHAsyncCallbackHandler(J9VMThread *vmThread, IDATA handlerKey, void *userData);
 extern J9_CFUNC void j9gc_objaccess_staticStoreI64(J9VMThread *vmThread, J9Class *clazz, I_64 *destSlot, I_64 value, UDATA isVolatile);

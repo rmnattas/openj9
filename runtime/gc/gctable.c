@@ -181,6 +181,7 @@ J9MemoryManagerFunctions MemoryManagerFunctions = {
 	j9gc_objaccess_readObjectFromInternalVMSlot,
 	j9gc_objaccess_arrayObjectDataDisplacement,
 	j9gc_objaccess_getArrayObjectDataAddress,
+	j9gc_objaccess_contiguousIndexableHeaderSize,
 	j9gc_objaccess_getLockwordAddress,
 	j9gc_objaccess_cloneObject,
 	j9gc_objaccess_copyObjectFields,
