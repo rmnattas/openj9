@@ -11936,7 +11936,7 @@ J9::Power::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&result
             bool loadDataAddr = false;
             bool separateDestAndOffset = false;
 
-         #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+          #if defined (J9VM_GC_SPARSE_HEAP_ALLOCATION)
             if (TR::Compiler->om.isOffHeapAllocationEnabled() && comp->target().is64Bit() && (!dest->isNull()))
                {
                if (dest->getSymbolReference() != NULL)
@@ -12000,7 +12000,7 @@ J9::Power::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&result
                }
             else // CASE (1) and (2): dest += destoffset, then pass in to evaluator
                {
-            #if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+            #if defined (J9VM_GC_SPARSE_HEAP_ALLOCATION)
 
                if (loadDataAddr) // CASE (2) only
                   {

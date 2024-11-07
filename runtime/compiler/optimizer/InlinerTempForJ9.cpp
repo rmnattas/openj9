@@ -1816,7 +1816,7 @@ TR_J9InlinerPolicy::createUnsafeCASCallDiamond(TR::TreeTop *callNodeTreeTop, TR:
    TR::TreeTop *arrayAccessTreeTop = NULL;
    TR::TreeTop *nonArrayAccessTreeTop = NULL;
 
-#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+#if defined (J9VM_GC_SPARSE_HEAP_ALLOCATION)
    if (arrayTestNeeded)
       {
       //create array test treetop
@@ -2715,7 +2715,7 @@ TR_J9InlinerPolicy::inlineUnsafeCall(TR::ResolvedMethodSymbol *calleeSymbol, TR:
       case TR::sun_misc_Unsafe_compareAndSwapObject_jlObjectJjlObjectjlObject_Z:
          if (callNode->isSafeForCGToFastPathUnsafeCall())
             return false;
-#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+#if defined (J9VM_GC_SPARSE_HEAP_ALLOCATION)
          if(TR::Compiler->om.isOffHeapAllocationEnabled())
             return createUnsafeCASCallDiamond(callNodeTreeTop, callNode);
 #endif /* J9VM_GC_SPARSE_HEAP_ALLOCATION */
