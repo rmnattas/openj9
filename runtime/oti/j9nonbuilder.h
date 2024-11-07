@@ -4711,6 +4711,7 @@ typedef struct J9MemoryManagerFunctions {
 	void  ( *j9gc_objaccess_storeObjectToInternalVMSlot)(struct J9VMThread *vmThread, j9object_t *destSlot, j9object_t value) ;
 	j9object_t  ( *j9gc_objaccess_readObjectFromInternalVMSlot)(struct J9VMThread *vmThread, struct J9JavaVM *vm, j9object_t *srcSlot) ;
 	U_8*  ( *j9gc_objaccess_getArrayObjectDataAddress)(struct J9VMThread *vmThread, J9IndexableObject *arrayObject) ;
+	I_16  ( *j9gc_objaccess_contiguousIndexableHeaderSize)(struct J9VMThread *vmThread, J9IndexableObject *arrayObject) ;
 	j9objectmonitor_t*  ( *j9gc_objaccess_getLockwordAddress)(struct J9VMThread *vmThread, j9object_t object) ;
 	void  ( *j9gc_objaccess_cloneObject)(struct J9VMThread *vmThread, j9object_t srcObject, j9object_t destObject) ;
 	void ( *j9gc_objaccess_copyObjectFields)(struct J9VMThread *vmThread, J9Class* valueClass, j9object_t srcObject, UDATA srcOffset, j9object_t destObject, UDATA destOffset, MM_objectMapFunction objectMapFunction, void *objectMapData, UDATA initializeLockWord) ;
