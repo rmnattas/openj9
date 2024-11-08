@@ -179,6 +179,7 @@ J9MemoryManagerFunctions MemoryManagerFunctions = {
 #endif /* !J9VM_ENV_DATA64 */
 	j9gc_objaccess_storeObjectToInternalVMSlot,
 	j9gc_objaccess_readObjectFromInternalVMSlot,
+	j9gc_objaccess_arrayObjectDataDisplacement,
 	j9gc_objaccess_getArrayObjectDataAddress,
 	j9gc_objaccess_getLockwordAddress,
 	j9gc_objaccess_cloneObject,

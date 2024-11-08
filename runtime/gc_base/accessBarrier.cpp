@@ -341,6 +341,13 @@ j9gc_objaccess_staticStoreU64Split(J9VMThread *vmThread, J9Class *clazz, U_64 *d
 	barrier->staticStoreU64(vmThread, clazz, destSlot, value64, 0 != isVolatile);
 }
 
+IDATA
+j9gc_objaccess_arrayObjectDataDisplacement(J9VMThread *vmThread,  J9IndexableObject *src,  J9IndexableObject *dst)
+{
+	MM_ObjectAccessBarrier *barrier = MM_GCExtensions::getExtensions(vmThread)->accessBarrier;
+	return barrier->arrayObjectDataDisplacement(vmThread, src, dst);
+
+}
 
 /* TODO: After all array accesses in the VM have been made arraylet safe, 
  * it should be possible to delete this method + its associated ENVY and 

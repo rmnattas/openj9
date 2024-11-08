@@ -1446,6 +1446,20 @@ MM_ObjectAccessBarrier::staticStoreI64(J9VMThread *vmThread, J9Class *clazz, I_6
 	protectIfVolatileAfter(vmThread, isVolatile, false, true);
 }
 
+IDATA
+MM_ObjectAccessBarrier::arrayObjectDataDisplacement(J9VMThread *vmThread,  J9IndexableObject *src,  J9IndexableObject *dst)
+{
+	IDATA displacement = 0;
+	GC_ArrayObjectModel *indexableObjectModel = &_extensions->indexableObjectModel;
+
+	Assert_MM_true((0 == indexableObjectModel->getSizeInElements(dst)) || indexableObjectModel->isInlineContiguousArraylet(dst));
+
+	if (!indexableObjectModel->isVirtualLargeObjectHeapEnabled() || indexableObjectModel->isDataAdjacentToHeader(dst)) {
+		displacement = (IDATA) (((UDATA)dst) - ((UDATA)src));
+	}
+	return displacement;
+}
+
 /**
  * Return a pointer to the first byte of an array's object data
  * @param arrayObject the base pointer of the array object
