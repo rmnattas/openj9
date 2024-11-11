@@ -38,7 +38,6 @@ ifeq (zos_390-64_cmprssptrs, $(SPEC))
 		--enable-OMRTHREAD_LIB_ZOS \
 		--enable-OMR_ARCH_S390 \
 		--enable-OMR_ENV_DATA64 \
-		--enable-OMR_GC_SPARSE_HEAP_ALLOCATION \
 		--enable-OMR_GC_CONCURRENT_SCAVENGER \
 		--enable-OMR_GC_IDLE_HEAP_MANAGER \
 		--enable-OMR_PORT_CAN_RESERVE_SPECIFIC_ADDRESS \
@@ -63,7 +62,6 @@ ifeq (zos_390-64, $(SPEC))
 		--enable-OMRTHREAD_LIB_ZOS \
 		--enable-OMR_ARCH_S390 \
 		--enable-OMR_ENV_DATA64 \
-		--enable-OMR_GC_SPARSE_HEAP_ALLOCATION \
 		--enable-OMR_GC_CONCURRENT_SCAVENGER \
 		--enable-OMR_GC_IDLE_HEAP_MANAGER \
 		--enable-OMR_PORT_CAN_RESERVE_SPECIFIC_ADDRESS \
