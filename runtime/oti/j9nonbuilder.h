@@ -4729,6 +4729,7 @@ typedef struct J9MemoryManagerFunctions {
 #endif /* !defined(J9VM_ENV_DATA64) */
 	void  ( *j9gc_objaccess_storeObjectToInternalVMSlot)(struct J9VMThread *vmThread, j9object_t *destSlot, j9object_t value) ;
 	j9object_t  ( *j9gc_objaccess_readObjectFromInternalVMSlot)(struct J9VMThread *vmThread, struct J9JavaVM *vm, j9object_t *srcSlot) ;
+	IDATA ( *j9gc_objaccess_arrayObjectDataDisplacement)(struct J9VMThread *vmThread, J9IndexableObject *src, J9IndexableObject *dst) ;
 	U_8*  ( *j9gc_objaccess_getArrayObjectDataAddress)(struct J9VMThread *vmThread, J9IndexableObject *arrayObject) ;
 	I_16  ( *j9gc_objaccess_contiguousIndexableHeaderSize)(struct J9VMThread *vmThread, J9IndexableObject *arrayObject) ;
 	j9objectmonitor_t*  ( *j9gc_objaccess_getLockwordAddress)(struct J9VMThread *vmThread, j9object_t object) ;
