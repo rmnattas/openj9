@@ -2037,9 +2037,8 @@ MM_WriteOnceCompactor::fixupArrayletLeafRegionContentsAndObjectLists(MM_Environm
 	
 	while (NULL != (region = regionIterator.nextRegion())) {
 		if (region->_compactData._shouldFixup) {
-			/* This fixing up is specific for hybrid arraylets, for off-heap array the fix-up has been done for contiguous array pass.
-			 * So we should skip it for offheap enabled. It's a correctness problem, since we might be finding garbage references to scan.
-			 * Additionally, because the leaf regions are supposed to be left decommited till the array dies, we are recommiting them too early.
+			/* For off-heap/non-adjacent arrays, the fix up is done when any other
+			 *  contiguous/adjacent array is fixed up.
 			 */
 			if (!_extensions->isVirtualLargeObjectHeapEnabled) {
 				Assert_MM_true(region->isArrayletLeaf());
