@@ -2036,36 +2036,42 @@ MM_WriteOnceCompactor::fixupArrayletLeafRegionContentsAndObjectLists(MM_Environm
 	MM_HeapRegionDescriptorVLHGC *region = NULL;
 	
 	while (NULL != (region = regionIterator.nextRegion())) {
-		if (region->_compactData._shouldFixup) {  
-			Assert_MM_true(region->isArrayletLeaf());
-			J9Object* spineObject = (J9Object*)region->_allocateData.getSpine();
-			Assert_MM_true(NULL != spineObject);
+		if (region->_compactData._shouldFixup) {
+			/* This fixing up is specific for hybrid arraylets, for off-heap array the fix-up has been done for contiguous array pass.
+			 * So we should skip it for offheap enabled. It's a correctness problem, since we might be finding garbage references to scan.
+			 * Additionally, because the leaf regions are supposed to be left decommited till the array dies, we are recommiting them too early.
+			 */
+			if (!_extensions->isVirtualLargeObjectHeapEnabled) {
+				Assert_MM_true(region->isArrayletLeaf());
+				J9Object* spineObject = (J9Object*)region->_allocateData.getSpine();
+				Assert_MM_true(NULL != spineObject);
 
-			/* spine objects get fixed up later in fixupArrayletLeafRegionSpinePointers(), after a sync point */
-			spineObject = getForwardingPtr(spineObject);
+				/* spine objects get fixed up later in fixupArrayletLeafRegionSpinePointers(), after a sync point */
+				spineObject = getForwardingPtr(spineObject);
 
-			fj9object_t* slotPointer = (fj9object_t*)region->getLowAddress();
-			fj9object_t* endOfLeaf = (fj9object_t*)region->getHighAddress();
-			while (slotPointer < endOfLeaf) {
-				/* TODO: 4096 elements is an arbitrary number */
-				fj9object_t* endPointer = GC_SlotObject::addToSlotAddress(slotPointer, 4096, compressed);
-				if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
-					while (slotPointer < endPointer) {
-						GC_SlotObject slotObject(_javaVM->omrVM, slotPointer);
-						J9Object *pointer = slotObject.readReferenceFromSlot();
-						if (NULL != pointer) {
-							J9Object *forwardedPtr = getForwardingPtr(pointer);
-							slotObject.writeReferenceToSlot(forwardedPtr);
-							_interRegionRememberedSet->rememberReferenceForCompact(env, spineObject, forwardedPtr);
+				fj9object_t* slotPointer = (fj9object_t*)region->getLowAddress();
+				fj9object_t* endOfLeaf = (fj9object_t*)region->getHighAddress();
+				while (slotPointer < endOfLeaf) {
+					/* TODO: 4096 elements is an arbitrary number */
+					fj9object_t* endPointer = GC_SlotObject::addToSlotAddress(slotPointer, 4096, compressed);
+					if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
+						while (slotPointer < endPointer) {
+							GC_SlotObject slotObject(_javaVM->omrVM, slotPointer);
+							J9Object *pointer = slotObject.readReferenceFromSlot();
+							if (NULL != pointer) {
+								J9Object *forwardedPtr = getForwardingPtr(pointer);
+								slotObject.writeReferenceToSlot(forwardedPtr);
+								_interRegionRememberedSet->rememberReferenceForCompact(env, spineObject, forwardedPtr);
+							}
+							slotPointer = GC_SlotObject::addToSlotAddress(slotPointer, 1, compressed);
 						}
-						slotPointer = GC_SlotObject::addToSlotAddress(slotPointer, 1, compressed);
 					}
+					slotPointer = endPointer;
 				}
-				slotPointer = endPointer;
+
+				/* prove we didn't miss anything at the end */
+				Assert_MM_true(slotPointer == endOfLeaf);
 			}
-				
-			/* prove we didn't miss anything at the end */
-			Assert_MM_true(slotPointer == endOfLeaf);
 		} else if (region->_compactData._shouldCompact) {
 			if (!region->getUnfinalizedObjectList()->wasEmpty()) {
 				if (J9MODRON_HANDLE_NEXT_WORK_UNIT(env)) {
