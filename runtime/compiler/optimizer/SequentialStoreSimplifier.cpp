@@ -1655,7 +1655,15 @@ bool TR_arraycopySequentialStores::insertConsistentTree()
       dumpOptDetails(comp(), " insertTree: multiplier must be 1 in aiadd tree\n");
       return false;
       }
-   TR::SymbolReference* activeBaseRef = _activeAddrTree->getBaseVarNode()->isNull() ? NULL : _activeAddrTree->getBaseVarNode()->getChild()->skipConversions()->getSymbolReference();
+
+   TR::Node* activeBaseNode = NULL;
+   TR::SymbolReference* activeBaseRef = NULL;
+   if (_activeAddrTree->getBaseVarNode()->isNull())
+      {
+      activeBaseNode = _activeAddrTree->getBaseVarNode()->getChild()->skipConversions();
+      if (activeBaseNode->hasSymbolReference())
+         activeBaseRef = activeBaseNode->getSymbolReference();
+      }
    if (activeBaseRef == NULL)
       {
       dumpOptDetails(comp(), " insertTree: no base variable in aiadd tree\n");
@@ -1670,8 +1678,15 @@ bool TR_arraycopySequentialStores::insertConsistentTree()
       }
 
    // make sure the index variable and base variable is consistent with the first tree
-   TR::SymbolReference* baseRef = _addrTree[0]->getBaseVarNode()->isNull() ? NULL : _addrTree[0]->getBaseVarNode()->getChild()->skipConversions()->getSymbolReference();
-   if (baseRef != activeBaseRef)
+   TR::Node* baseNode = NULL;
+   TR::SymbolReference* baseRef = NULL;
+   if (_addrTree[0]->getBaseVarNode()->isNull())
+      {
+      baseNode = _addrTree[0]->getBaseVarNode()->getChild()->skipConversions();
+      if (baseNode->hasSymbolReference())
+         baseRef = baseNode->getSymbolReference();
+      }
+   if (baseRef != activeBaseRef || baseNode != activeBaseNode)
       {
       dumpOptDetails(comp(), " insertTree: base variable is different than previous tree\n");
       return false;
