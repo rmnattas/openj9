@@ -1933,6 +1933,8 @@ static TR::TreeTop* generateArraycopyFromSequentialStores(TR::Compilation* comp,
    if (!performTransformation(comp, "%sReducing arraycopy sequential stores\n", OPT_DETAILS))
       return istoreTreeTop;
 
+   printf("AA: Reduced arraycopy in %s\n", comp->signature()); fflush(stdout);
+
    dumpOptDetails(comp, " Load Node:%p Number of bytes: %d\n", istoreNode, numBytes);
 
    TR::SymbolReference *symRef = comp->getSymRefTab()->findOrCreateGenericIntShadowSymbolReference(0);
@@ -3225,7 +3227,7 @@ static TR::TreeTop* generateArraysetFromSequentialStores(TR::Compilation* comp, 
    if (!performTransformation(comp, "%sReducing arrayset sequential stores starting from n%un\n", OPT_DETAILS, istoreNode->getGlobalIndex()))
       return istoreTreeTop;
 
-   //printf("Reduced arrayset in %s\n", comp->signature()); fflush(stdout);
+   printf("AA: Reduced arrayset in %s\n", comp->signature()); fflush(stdout);
 
    //traceMsg(comp, " First store in sequence %p Load Ref:%p Number of bytes: %d. Offset range:%d to %d. Byte Value:%d\n", istoreNode, arrayset.getALoadRef(), numBytes, arrayset.getBaseOffset(), arrayset.getBaseOffset() + numBytes - 1, arrayset.getConstant());
 
@@ -3896,6 +3898,8 @@ static TR::TreeTop * reduceArrayLoad(TR_ArrayShiftTreeCollection * storeTrees, T
          {
          return NULL;
          }
+
+      printf("AA: Reduced array-shift in %s\n", comp->signature()); fflush(stdout);
 
       TR::SymbolReference *symRef = storeTrees->getTree(0)->getRootNode()->getSymbolReference();
 
