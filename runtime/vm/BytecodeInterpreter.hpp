@@ -10472,16 +10472,12 @@ public:
 	}
 	case J9_BCLOOP_J2I_TRANSITION:
 		_sendMethod = (J9Method *)actionData;
-#if defined(TRACE_TRANSITIONS)
 		getMethodName(PORTLIB, _sendMethod, (U_8*)-1, currentMethodName);
 		j9tty_printf(PORTLIB, "<%p> enter: J9_BCLOOP_J2I_TRANSITION %s\n", vmThread, currentMethodName);
-#endif
 		PERFORM_ACTION(j2iTransition(REGISTER_ARGS));
 	case J9_BCLOOP_J2I_INVOKE_EXACT: {
 		j9object_t methodHandle = (j9object_t)actionData;
-#if defined(TRACE_TRANSITIONS)
 		j9tty_printf(PORTLIB, "<%p> enter: J9_BCLOOP_J2I_INVOKE_EXACT methodHandle=%p\n", vmThread, methodHandle);
-#endif
 		PERFORM_ACTION(j2iInvokeExact(REGISTER_ARGS, methodHandle));
 	}
 	case J9_BCLOOP_I2J_TRANSITION:

@@ -49,7 +49,6 @@
 
 #undef TRACE_TRANSITIONS
 
-#if defined(TRACE_TRANSITIONS)
 #include "bcnames.h"
 #include "rommeth.h"
 
@@ -95,7 +94,6 @@ getMethodName(J9PortLibrary *PORTLIB, J9Method *method, U_8 *pc, char *buffer)
 		}
 	}
 }
-#endif
 
 #include "BytecodeInterpreter.hpp"
 
