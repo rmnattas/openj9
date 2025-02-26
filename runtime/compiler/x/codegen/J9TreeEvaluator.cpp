@@ -3033,10 +3033,14 @@ TR::Register *J9::X86::TreeEvaluator::ArrayStoreCHKEvaluator(TR::Node *node, TR:
          */
          if (firstChild->getFirstChild()->isDataAddrPointer())
             dstArrayNode = firstChild->getFirstChild()->getFirstChild();
-         else
+         else if (firstChild->getFirstChild()->getOpCodeValue() == TR::aladd && firstChild->getFirstChild()->getFirstChild()->isDataAddrPointer())
             {
             dstArrayNode = firstChild->getFirstChild()->getFirstChild()->getFirstChild();
             offsetNode = firstChild->getFirstChild()->getSecondChild();
+            }
+         else
+            {
+            TR_ASSERT_FATAL(false, "Unexpected array access tree shape for OffHeap in ArrayStoreCHKEvaluator");
             }
 
          cg->evaluate(dstArrayNode);
@@ -3296,8 +3300,6 @@ TR::Register *J9::X86::TreeEvaluator::ArrayStoreCHKEvaluator(TR::Node *node, TR:
       if (deferDestinationEvaluation && dstArrayNode->getRegister() != destinationRegister)
          {
          // For OffHeap tempMR->getBaseRegister() would be the dataAddrPtr not the baseArray.
-         // If dstArrayNode != (destinationRegister = firstChild->getChild(2)),
-         // dstArrayNode needs to be added to the deps list.
          deps->unionPostCondition(dstArrayNode->getRegister(), TR::RealRegister::NoReg, cg);
          }
 
