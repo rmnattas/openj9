@@ -6526,17 +6526,19 @@ TR::Register *J9::Power::TreeEvaluator::VMnewEvaluator(TR::Node *node, TR::CodeG
                TR::LabelSymbol *nonZeroArrayLabel = generateLabelSymbol(cg);
 
                iCursor = generateTrg1Src1ImmInstruction(cg,TR::InstOpCode::cmpli4, node, condReg, enumReg, 0, iCursor);
-               iCursor = generateConditionalBranchInstruction(cg, TR::InstOpCode::bgt, node, nonZeroArrayLabel, condReg, iCursor);
-               // Clear dataAddr field of 0 size array
                if (needZeroInit)
                   {
-                  // Use zeroReg to clear the field
-                  iCursor = generateMemSrc1Instruction(cg, TR::InstOpCode::std,
-                     node,
+                  iCursor = generateConditionalBranchInstruction(cg, TR::InstOpCode::bgt, node, nonZeroArrayLabel, condReg, iCursor);
+                  // Clear dataAddr field of 0 size array. Use zeroReg to clear the field
+                  iCursor = generateMemSrc1Instruction(cg, TR::InstOpCode::std, node,
                      TR::MemoryReference::createWithDisplacement(cg, resReg, fej9->getOffsetOfDiscontiguousDataAddrField(), 8),
                      zeroReg, iCursor);
+                  iCursor = generateLabelInstruction(cg, TR::InstOpCode::b, node, dataAddrInitDoneLabel);
                   }
-               iCursor = generateLabelInstruction(cg, TR::InstOpCode::b, node, dataAddrInitDoneLabel);
+               else
+                  {
+                  iCursor = generateConditionalBranchInstruction(cg, TR::InstOpCode::beq, node, dataAddrInitDoneLabel, condReg, iCursor);
+                  }
 
                // Init dataAddr field for non-zero size array
                iCursor = generateLabelInstruction(cg, TR::InstOpCode::label, node, nonZeroArrayLabel, iCursor);
