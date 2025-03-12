@@ -322,7 +322,7 @@ void J9::RecognizedCallTransformer::process_java_lang_StringLatin1_inflate_BIBII
    arrayTranslateNode->setTableBackedByRawStorage(true);
    arrayTranslateNode->setSymbolReference(comp()->getSymRefTab()->findOrCreateArrayTranslateSymbol());
 
-   TR::Node *tmpNode = TR::TransformUtil::generateConvertArrayElementIndexToOffsetTrees(comp(), srcOff, NULL, 2, false);
+   TR::Node *tmpNode = TR::TransformUtil::generateConvertArrayElementIndexToOffsetTrees(comp(), srcOff, NULL, 1, false);
    TR::Node *srcAddr = TR::TransformUtil::generateArrayElementAddressTrees(comp(), srcObj, tmpNode);
    tmpNode = TR::TransformUtil::generateConvertArrayElementIndexToOffsetTrees(comp(), dstOff, NULL, 2, false);
    TR::Node *dstAddr = TR::TransformUtil::generateArrayElementAddressTrees(comp(), dstObj, tmpNode);
