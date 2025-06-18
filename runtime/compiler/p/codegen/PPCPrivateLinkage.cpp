@@ -1072,6 +1072,25 @@ void J9::Power::PrivateLinkage::createPrologue(TR::Instruction *cursor)
       cg()->addSnippet(snippet);
       cursor = generateLabelInstruction(cg(), TR::InstOpCode::label, firstNode, reStartLabel, cursor);
       }
+   else
+      {
+      if (!cg()->hasDataSnippets())
+         {
+         TR::Instruction *lastInstr = cg()->getAppendInstruction();
+         TR::Instruction *currInstr = lastInstr;
+         while (true)
+            {
+            if (currInstr->getOpCode().getFormat() == FORMAT_NONE)
+               currInstr = currInstr->getPrev();
+            else
+               break;
+            }
+         if (currInstr->getGCMap())
+            {
+            cg()->generateNop(NULL, lastInstr);
+            }
+         }
+      }
 
    if (intSavedFirst <= TR::RealRegister::LastGPR)
       {
