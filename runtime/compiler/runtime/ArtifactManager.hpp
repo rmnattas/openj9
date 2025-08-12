@@ -74,6 +74,38 @@ private:
    J9VMThread *_currentThread;
 };
 
+class TR_VMAccessHelper {
+public:
+
+   /**
+      @brief Acquires  VM access if necessary.
+
+       VM access is required if we have a current thread.
+      @param vm Used to access VM functions to acquire the current thread and acquire  VM access.
+   */
+   TR_VMAccessHelper(J9JavaVM *vm);
+
+   /**
+      @brief Releases VM access if appropriate.
+
+       VM access will have been acquired if we have a current thread.
+   */
+   ~TR_VMAccessHelper();
+private:
+   /**
+      @brief Used to access internal VM functions.
+   */
+   J9JavaVM *_vm;
+
+   /**
+      @brief Used to determine if we require  VM access
+   */
+   J9VMThread *_currentThread;
+
+   bool _alreadyHaveVMAccess = false; // indicates if we have acquired VM access
+};
+
+
 /**
    @class TR_TranslationArtifactManager
    @brief Manages JIT access to VM JIT artifacts.

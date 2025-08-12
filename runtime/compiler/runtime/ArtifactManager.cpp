@@ -46,6 +46,21 @@ TR_VMExclusiveAccess::~TR_VMExclusiveAccess()
       _vm->internalVMFunctions->releaseExclusiveVMAccess(_currentThread);
    }
 
+   TR_VMAccessHelper::TR_VMAccessHelper(J9JavaVM *vm) :
+   _vm(vm),
+   _currentThread(vm->internalVMFunctions->currentVMThread(vm))
+   {
+   _alreadyHaveVMAccess = ((_currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS) != 0);
+   if (_currentThread && !_alreadyHaveVMAccess)
+      _vm->internalVMFunctions->internalAcquireVMAccess(_currentThread);
+   }
+
+
+TR_VMAccessHelper::~TR_VMAccessHelper()
+   {
+   if (_currentThread && !_alreadyHaveVMAccess)
+      _vm->internalVMFunctions->internalReleaseVMAccess(_currentThread);
+   }
 
 bool
 TR_TranslationArtifactManager::initializeGlobalArtifactManager(J9AVLTree *translationArtifacts, J9JavaVM *vm)
@@ -114,7 +129,8 @@ bool
 TR_TranslationArtifactManager::insertArtifact(J9JITExceptionTable *artifact)
    {
    TR_ASSERT(artifact, "artifact must not be null");
-   OMR::CriticalSection insertingArtifact(_monitor);
+   // OMR::CriticalSection insertingArtifact(_monitor);
+   TR_VMExclusiveAccess exclusiveAccess(_vm);
    bool insertSuccess = false;
    insertSuccess = insertRange(artifact, artifact->startPC, artifact->endWarmPC);
    if (insertSuccess && artifact->startColdPC)
@@ -140,7 +156,8 @@ bool
 TR_TranslationArtifactManager::removeArtifact(J9JITExceptionTable *artifact)
    {
    TR_ASSERT(artifact, "artifact must not be null");
-   OMR::CriticalSection removingArtifact(_monitor);
+   // OMR::CriticalSection removingArtifact(_monitor);
+   TR_VMExclusiveAccess exclusiveAccess(_vm);
    bool removeSuccess = false;
    if (containsArtifact(artifact))
       {
@@ -159,7 +176,8 @@ const J9JITExceptionTable *
 TR_TranslationArtifactManager::retrieveArtifact(UDATA pc) const
    {
    TR_ASSERT(pc != 0, "attempting to query existing artifacts for a NULL PC");
-   OMR::CriticalSection searchingArtifacts(_monitor);
+   // OMR::CriticalSection searchingArtifacts(_monitor);
+   TR_VMAccessHelper searchingArtifacts(_vm);
    updateCache(pc);
    if (!_retrievedArtifactCache)
       {
