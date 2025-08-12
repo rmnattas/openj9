@@ -4347,6 +4347,7 @@ typedef struct J9JITConfig {
 	UDATA codeCacheTotalKB;
 	UDATA dataCacheTotalKB;
 	struct J9JITExceptionTable*  ( *jitGetExceptionTableFromPC)(struct J9VMThread * vmThread, UDATA jitPC) ;
+	struct J9JITExceptionTable*  ( *jitGetExceptionTableFromPCExclusive)(struct J9VMThread * vmThread, UDATA jitPC, struct J9VMThread * currentThread) ;
 	void*  ( *jitGetStackMapFromPC)(struct J9VMThread * currentThread, struct J9JavaVM * vm, struct J9JITExceptionTable * exceptionTable, UDATA jitPC) ;
 	void*  ( *jitGetInlinerMapFromPC)(struct J9VMThread * currentThread, struct J9JavaVM * vm, struct J9JITExceptionTable * exceptionTable, UDATA jitPC) ;
 	UDATA  ( *getJitInlineDepthFromCallSite)(struct J9JITExceptionTable *metaData, void *inlinedCallSite) ;

@@ -468,6 +468,7 @@ void codert_init_helpers_and_targets(J9JITConfig * jitConfig, char isSMP)
    TR::CompilationInfo * compInfo = TR::CompilationInfo::get(jitConfig);
 
    jitConfig->jitGetExceptionTableFromPC = jitGetExceptionTableFromPC;
+   jitConfig->jitGetExceptionTableFromPCExclusive = jitGetExceptionTableFromPCExclusive;
    jitConfig->jitGetStackMapFromPC = getStackMapFromJitPC;
    jitConfig->jitGetInlinerMapFromPC = jitGetInlinerMapFromPC;
    jitConfig->getJitInlineDepthFromCallSite = getJitInlineDepthFromCallSite;

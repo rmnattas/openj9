@@ -66,6 +66,7 @@
 #else
 #define UPDATE_PC_FROM(walkState, pcExpression) (walkState)->pc = MASK_PC((U_8 *) (pcExpression))
 #define jitGetExceptionTable(walkState) jitGetExceptionTableFromPC((walkState)->walkThread, (UDATA) (walkState)->pc)
+#define jitGetExceptionTableExclusive(walkState) jitGetExceptionTableFromPCExclusive((walkState)->walkThread, (UDATA) (walkState)->pc, (walkState)->currentThread)
 #endif
 
 #ifdef J9VM_JIT_FULL_SPEED_DEBUG
@@ -171,7 +172,7 @@ UDATA  jitWalkStackFrames(J9StackWalkState *walkState)
 	savedDropToCurrentFrame = walkState->dropToCurrentFrame;
 	walkState->dropToCurrentFrame = jitDropToCurrentFrame;
 
-	while ((walkState->jitInfo = jitGetExceptionTable(walkState)) != NULL) {
+	while ((walkState->jitInfo = jitGetExceptionTableFromPCExclusive((walkState)->walkThread, (UDATA) (walkState)->pc, (walkState)->currentThread)) != NULL) {
 		walkState->stackMap = NULL;
 		walkState->inlineMap = NULL;
 		walkState->bp = walkState->unwindSP + getJitTotalFrameSize(walkState->jitInfo);
@@ -1479,9 +1480,84 @@ typedef struct TR_jit_artifact_search_cache
 	J9JITExceptionTable * volatile exceptionTable;
 } TR_jit_artifact_search_cache;
 
+J9JITExceptionTable * jitGetExceptionTableFromPCExclusive(J9VMThread * vmThread, UDATA jitPC, J9VMThread * currentThread)
+{
+	UDATA maskedPC = (UDATA)MASK_PC(jitPC);
+	int alreadyHaveVMAccess;
+#ifdef J9JIT_ARTIFACT_SEARCH_CACHE_ENABLE
+	TR_jit_artifact_search_cache *artifactSearchCache = vmThread->jitArtifactSearchCache;
+	if (J9_ARE_NO_BITS_SET((UDATA)artifactSearchCache, J9_STACKWALK_NO_JIT_CACHE)) {
+		J9JITExceptionTable *exceptionTable = NULL;
+		TR_jit_artifact_search_cache *cacheEntry = NULL;
+		if (NULL == artifactSearchCache) {
+			TR_jit_artifact_search_cache *existingCache = NULL;
+			PORT_ACCESS_FROM_JAVAVM(vmThread->javaVM);
+			artifactSearchCache = j9mem_allocate_memory(JIT_ARTIFACT_SEARCH_CACHE_SIZE * sizeof (TR_jit_artifact_search_cache), OMRMEM_CATEGORY_JIT);
+			if (NULL == artifactSearchCache) {
+				goto noCache;
+			}
+			memset(artifactSearchCache, 0, JIT_ARTIFACT_SEARCH_CACHE_SIZE * sizeof(TR_jit_artifact_search_cache));
+			/* The vmThread parameter to this function may not be the current thread, so ensure that only a single
+			 * instance of the cache is allocated for the thread, and make sure the empty cache entries for a new
+			 * cache are visible to other threads before the cache pointer is visible.
+			 */
+			issueWriteBarrier();
+			existingCache = (TR_jit_artifact_search_cache*)compareAndSwapUDATA((uintptr_t*)&vmThread->jitArtifactSearchCache, (uintptr_t)existingCache, (uintptr_t)artifactSearchCache);
+			if (NULL != existingCache) {
+				j9mem_free_memory(artifactSearchCache);
+				artifactSearchCache = existingCache;
+			}
+		}
+		cacheEntry = &(artifactSearchCache[JIT_ARTIFACT_SEARCH_CACHE_HASH_RESULT(maskedPC)]);
+		if (cacheEntry->searchValue == maskedPC) {
+			exceptionTable = cacheEntry->exceptionTable;
+			/* The cache is not thread-safe - it's possible to view an inconsistent pc/metadata pair from one
+			 * thread while another thread is updating the cache entry. To counteract this, verify that the
+			 * found metadata is valid for the input PC. If not, ignore the cache and go to the underlying
+			 * hash table.
+			 */
+			if ((NULL == exceptionTable)
+			|| !(((maskedPC >= exceptionTable->startPC) && (maskedPC < exceptionTable->endWarmPC))
+				|| ((0 != exceptionTable->startColdPC) && (maskedPC >= exceptionTable->startColdPC) && (maskedPC < exceptionTable->endPC)))
+			) {
+				// printf("\nAA1: (%p) try\n", vmThread); fflush(stdout);
+				alreadyHaveVMAccess = ((currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS) != 0) ? 1 : 0;
+				if (!alreadyHaveVMAccess)
+					currentThread->javaVM->internalVMFunctions->internalAcquireVMAccess(currentThread);
+				exceptionTable = jit_artifact_search(vmThread->javaVM->jitConfig->translationArtifacts, maskedPC);
+				if (!alreadyHaveVMAccess)
+					currentThread->javaVM->internalVMFunctions->internalReleaseVMAccess(currentThread);
+			}
+	 	} else {
+			alreadyHaveVMAccess = ((currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS) != 0) ? 1 : 0;
+			if (!alreadyHaveVMAccess)
+				currentThread->javaVM->internalVMFunctions->internalAcquireVMAccess(currentThread);
+			exceptionTable = jit_artifact_search(vmThread->javaVM->jitConfig->translationArtifacts, maskedPC);
+			if (!alreadyHaveVMAccess)
+					currentThread->javaVM->internalVMFunctions->internalReleaseVMAccess(currentThread);
+			if (NULL != exceptionTable) {
+				cacheEntry->searchValue = maskedPC;
+				cacheEntry->exceptionTable = exceptionTable;
+			}
+		}
+		return exceptionTable;
+	}
+noCache:
+#endif /* J9JIT_ARTIFACT_SEARCH_CACHE_ENABLE */
+	alreadyHaveVMAccess = ((currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS) != 0) ? 1 : 0;
+	if (!alreadyHaveVMAccess)
+		currentThread->javaVM->internalVMFunctions->internalAcquireVMAccess(currentThread);
+	J9JITExceptionTable * exceptionTable = jit_artifact_search(vmThread->javaVM->jitConfig->translationArtifacts, maskedPC);
+	if (!alreadyHaveVMAccess)
+		currentThread->javaVM->internalVMFunctions->internalReleaseVMAccess(currentThread);
+	return exceptionTable;
+}
+
+
 J9JITExceptionTable * jitGetExceptionTableFromPC(J9VMThread * vmThread, UDATA jitPC)
 {
 	UDATA maskedPC = (UDATA)MASK_PC(jitPC);
+	int alreadyHaveVMAccess;
 #ifdef J9JIT_ARTIFACT_SEARCH_CACHE_ENABLE
 	TR_jit_artifact_search_cache *artifactSearchCache = vmThread->jitArtifactSearchCache;
 	if (J9_ARE_NO_BITS_SET((UDATA)artifactSearchCache, J9_STACKWALK_NO_JIT_CACHE)) {
@@ -1533,9 +1609,6 @@ noCache:
 #endif /* J9JIT_ARTIFACT_SEARCH_CACHE_ENABLE */
 	return jit_artifact_search(vmThread->javaVM->jitConfig->translationArtifacts, maskedPC);
 }
-
-
-
 
 /* Only callable from inside a visible-only walk on the current thread (with VM access) */
 
