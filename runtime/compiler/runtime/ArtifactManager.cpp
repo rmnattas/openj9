@@ -35,14 +35,15 @@ TR_VMExclusiveAccess::TR_VMExclusiveAccess(J9JavaVM *vm) :
    _vm(vm),
    _currentThread(vm->internalVMFunctions->currentVMThread(vm))
    {
-   if (_currentThread)
+   alreadyHaveVMAccess = ((_currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS) != 0) ? 1 : 0;
+   if (_currentThread && !alreadyHaveVMAccess)
       _vm->internalVMFunctions->acquireExclusiveVMAccess(_currentThread);
    }
 
 
 TR_VMExclusiveAccess::~TR_VMExclusiveAccess()
    {
-   if (_currentThread)
+   if (_currentThread && !alreadyHaveVMAccess)
       _vm->internalVMFunctions->releaseExclusiveVMAccess(_currentThread);
    }
 

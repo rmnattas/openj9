@@ -72,6 +72,8 @@ private:
       @brief Used to determine if we require exclusive VM access
    */
    J9VMThread *_currentThread;
+
+   int alreadyHaveVMAccess;
 };
 
 class TR_VMAccessHelper {
