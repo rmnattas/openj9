@@ -1524,9 +1524,7 @@ J9JITExceptionTable * jitGetExceptionTableFromPCExclusive(J9VMThread * vmThread,
 				printf("\nAA1: (%p) AlreadyHaveVMAccess=%d try\n", currentThread, alreadyHaveVMAccess); fflush(stdout);
 				if (!alreadyHaveVMAccess)
 					currentThread->javaVM->internalVMFunctions->internalAcquireVMAccess(currentThread);
-				currentThread->javaVM->internalVMFunctions->acquireExclusiveVMAccess(currentThread);
 				exceptionTable = jit_artifact_search(vmThread->javaVM->jitConfig->translationArtifacts, maskedPC);
-				currentThread->javaVM->internalVMFunctions->releaseExclusiveVMAccess(currentThread);
 				if (!alreadyHaveVMAccess)
 					currentThread->javaVM->internalVMFunctions->internalReleaseVMAccess(currentThread);
 			}
@@ -1535,9 +1533,7 @@ J9JITExceptionTable * jitGetExceptionTableFromPCExclusive(J9VMThread * vmThread,
 			printf("\nAA2: (%p) AlreadyHaveVMAccess=%d try\n", currentThread, alreadyHaveVMAccess); fflush(stdout);
 			if (!alreadyHaveVMAccess)
 				currentThread->javaVM->internalVMFunctions->internalAcquireVMAccess(currentThread);
-			currentThread->javaVM->internalVMFunctions->acquireExclusiveVMAccess(currentThread);
 			exceptionTable = jit_artifact_search(vmThread->javaVM->jitConfig->translationArtifacts, maskedPC);
-			currentThread->javaVM->internalVMFunctions->releaseExclusiveVMAccess(currentThread);
 			if (!alreadyHaveVMAccess)
 				currentThread->javaVM->internalVMFunctions->internalReleaseVMAccess(currentThread);
 			if (NULL != exceptionTable) {
@@ -1553,9 +1549,7 @@ noCache:
 	printf("\nAA3: (%p) AlreadyHaveVMAccess=%d try\n", currentThread, alreadyHaveVMAccess); fflush(stdout);
 	if (!alreadyHaveVMAccess)
 		currentThread->javaVM->internalVMFunctions->internalAcquireVMAccess(currentThread);
-	currentThread->javaVM->internalVMFunctions->acquireExclusiveVMAccess(currentThread);
 	J9JITExceptionTable * exceptionTable = jit_artifact_search(vmThread->javaVM->jitConfig->translationArtifacts, maskedPC);
-	currentThread->javaVM->internalVMFunctions->releaseExclusiveVMAccess(currentThread);
 	if (!alreadyHaveVMAccess)
 		currentThread->javaVM->internalVMFunctions->internalReleaseVMAccess(currentThread);
 	return exceptionTable;
