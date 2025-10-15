@@ -1523,19 +1523,23 @@ J9JITExceptionTable * jitGetExceptionTableFromPCExclusive(J9VMThread * vmThread,
 				alreadyHaveVMAccess = ((currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS) != 0) ? 1 : 0;
 				printf("\nAA1: (%p) AlreadyHaveVMAccess=%d try\n", currentThread, alreadyHaveVMAccess); fflush(stdout);
 				if (!alreadyHaveVMAccess)
-					currentThread->javaVM->internalVMFunctions->acquireExclusiveVMAccess(currentThread);
+					currentThread->javaVM->internalVMFunctions->internalAcquireVMAccess(currentThread);
+				currentThread->javaVM->internalVMFunctions->acquireExclusiveVMAccess(currentThread);
 				exceptionTable = jit_artifact_search(vmThread->javaVM->jitConfig->translationArtifacts, maskedPC);
+				currentThread->javaVM->internalVMFunctions->releaseExclusiveVMAccess(currentThread);
 				if (!alreadyHaveVMAccess)
-					currentThread->javaVM->internalVMFunctions->releaseExclusiveVMAccess(currentThread);
+					currentThread->javaVM->internalVMFunctions->internalReleaseVMAccess(currentThread);
 			}
 	 	} else {
 			alreadyHaveVMAccess = ((currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS) != 0) ? 1 : 0;
 			printf("\nAA2: (%p) AlreadyHaveVMAccess=%d try\n", currentThread, alreadyHaveVMAccess); fflush(stdout);
 			if (!alreadyHaveVMAccess)
-				currentThread->javaVM->internalVMFunctions->acquireExclusiveVMAccess(currentThread);
+				currentThread->javaVM->internalVMFunctions->internalAcquireVMAccess(currentThread);
+			currentThread->javaVM->internalVMFunctions->acquireExclusiveVMAccess(currentThread);
 			exceptionTable = jit_artifact_search(vmThread->javaVM->jitConfig->translationArtifacts, maskedPC);
+			currentThread->javaVM->internalVMFunctions->releaseExclusiveVMAccess(currentThread);
 			if (!alreadyHaveVMAccess)
-					currentThread->javaVM->internalVMFunctions->releaseExclusiveVMAccess(currentThread);
+				currentThread->javaVM->internalVMFunctions->internalReleaseVMAccess(currentThread);
 			if (NULL != exceptionTable) {
 				cacheEntry->searchValue = maskedPC;
 				cacheEntry->exceptionTable = exceptionTable;
@@ -1548,10 +1552,12 @@ noCache:
 	alreadyHaveVMAccess = ((currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS) != 0) ? 1 : 0;
 	printf("\nAA3: (%p) AlreadyHaveVMAccess=%d try\n", currentThread, alreadyHaveVMAccess); fflush(stdout);
 	if (!alreadyHaveVMAccess)
-		currentThread->javaVM->internalVMFunctions->acquireExclusiveVMAccess(currentThread);
+		currentThread->javaVM->internalVMFunctions->internalAcquireVMAccess(currentThread);
+	currentThread->javaVM->internalVMFunctions->acquireExclusiveVMAccess(currentThread);
 	J9JITExceptionTable * exceptionTable = jit_artifact_search(vmThread->javaVM->jitConfig->translationArtifacts, maskedPC);
+	currentThread->javaVM->internalVMFunctions->releaseExclusiveVMAccess(currentThread);
 	if (!alreadyHaveVMAccess)
-		currentThread->javaVM->internalVMFunctions->releaseExclusiveVMAccess(currentThread);
+		currentThread->javaVM->internalVMFunctions->internalReleaseVMAccess(currentThread);
 	return exceptionTable;
 }
 

@@ -33,18 +33,27 @@ TR_TranslationArtifactManager *TR_TranslationArtifactManager::globalManager = NU
 
 TR_VMExclusiveAccess::TR_VMExclusiveAccess(J9JavaVM *vm) :
    _vm(vm),
-   _currentThread(vm->internalVMFunctions->currentVMThread(vm))
+   _currentThread(vm->internalVMFunctions->currentVMThread(vm)),
+   alreadyHaveVMAccess(1)
    {
-   alreadyHaveVMAccess = ((_currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS) != 0) ? 1 : 0;
-   if (_currentThread && !alreadyHaveVMAccess)
+   if (_currentThread)
+      {
+      alreadyHaveVMAccess = ((_currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS) != 0) ? 1 : 0;
+      if (!alreadyHaveVMAccess)
+         _vm->internalVMFunctions->internalAcquireVMAccess(_currentThread);
       _vm->internalVMFunctions->acquireExclusiveVMAccess(_currentThread);
+      }
    }
 
 
 TR_VMExclusiveAccess::~TR_VMExclusiveAccess()
    {
-   if (_currentThread && !alreadyHaveVMAccess)
+   if (_currentThread)
+      {
       _vm->internalVMFunctions->releaseExclusiveVMAccess(_currentThread);
+      if (!alreadyHaveVMAccess)
+         _vm->internalVMFunctions->internalReleaseVMAccess(_currentThread);
+      }
    }
 
    TR_VMAccessHelper::TR_VMAccessHelper(J9JavaVM *vm) :
