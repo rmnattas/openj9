@@ -754,9 +754,11 @@ TR_RelocationRuntime::relocateAOTCodeAndData(U_8 *tempDataStart,
       {
       // insert exceptionTable into JIT artifacts avl tree under mutex
          {
-         TR_TranslationArtifactManager::CriticalSection updateMetaData;
+         TR_TranslationArtifactManager *artifactManager = TR_TranslationArtifactManager::getGlobalArtifactManager();
+         // TR_TranslationArtifactManager::CriticalSection updateMetaData;
 
-         jit_artifact_insert(javaVM()->portLibrary, jitConfig()->translationArtifacts, _exceptionTable);
+         artifactManager->insertArtifact(_exceptionTable);
+         // jit_artifact_insert(javaVM()->portLibrary, jitConfig()->translationArtifacts, _exceptionTable);
 
 #if !defined(J9VM_OPT_JITSERVER)
          // Fix up RAM method
