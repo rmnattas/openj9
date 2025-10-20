@@ -42,8 +42,6 @@
 #include "ut_j9codertvm.h"
 #endif
 
-#define J9JIT_ARTIFACT_SEARCH_CACHE_ENABLE
-
 #ifndef J9VM_INTERP_STACKWALK_TRACING
 #define walkFrame (walkState->walkThread->javaVM->walkFrame)
 #define walkBytecodeFrameSlots (walkState->walkThread->javaVM->internalVMFunctions->walkBytecodeFrameSlots)
