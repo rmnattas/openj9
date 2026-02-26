@@ -36,13 +36,17 @@ extern "C" {
 
 void
 threadParkImpl(J9VMThread *vmThread, BOOLEAN timeoutIsEpochRelative, I_64 timeout)
-{
+{ 
 	const I_32 oneMillion = 1000000;
 	I_64 millis = 0;
 	I_32 nanos = 0;
 	IDATA rc = 0;
 	UDATA thrstate = J9_PUBLIC_FLAGS_THREAD_PARKED;
 	J9JavaVM *vm = vmThread->javaVM;
+
+	if (getenv("AA_TraceUPMon")){
+		fprintf(stderr, "AA_TraceUPMon2.1: threadParkImpl Entry by thread %p\n", vmThread);
+	}
 
 	/* Trc_JCL_park_Entry(vmThread, timeoutIsEpochRelative, timeout); */
 	if ((0 != timeout) || timeoutIsEpochRelative) {
@@ -101,6 +105,9 @@ threadParkImpl(J9VMThread *vmThread, BOOLEAN timeoutIsEpochRelative, I_64 timeou
 		U_32 oldState = J9_ARE_ANY_BITS_SET(thrstate, J9_PUBLIC_FLAGS_THREAD_TIMED)
 				? VM_VMHelpers::setThreadState(vmThread, J9VMTHREAD_STATE_PARKED_TIMED)
 				: VM_VMHelpers::setThreadState(vmThread, J9VMTHREAD_STATE_PARKED);
+		if (getenv("AA_TraceUPMon")){
+			fprintf(stderr, "AA_TraceUPMon2.2: threadParkImpl Condition by thread %p\n", vmThread);
+		}
 		internalReleaseVMAccessSetStatus(vmThread, thrstate);
 
 		while (1) {

@@ -198,6 +198,10 @@ public:
 		UDATA savedPublicFlags = vmThread->publicFlags;
 		UDATA publicFlags = 0;
 
+		if (getenv("AA_TraceUPMon")){
+			fprintf(stderr, "AA_TraceUPMon3.1: inlineReleaseVMAccessSetStatus Entry by thread %p (publicFlags=%p)\n", vmThread, (void*)savedPublicFlags);
+		}
+
 		VM_AtomicSupport::writeBarrier();
 		for (;;) {
 			if (savedPublicFlags & J9_PUBLIC_FLAGS_VMACCESS_RELEASE_BITS) {
@@ -213,6 +217,10 @@ public:
 
 			/* update the saved value and try again */
 			savedPublicFlags = publicFlags;
+		}
+
+		if (getenv("AA_TraceUPMon")){
+			fprintf(stderr, "AA_TraceUPMon3.2: inlineReleaseVMAccessSetStatus Unless by thread %p (publicFlags=%p)\n", vmThread, (void*)savedPublicFlags);
 		}
 
 		omrthread_monitor_t const publicFlagsMutex = vmThread->publicFlagsMutex;

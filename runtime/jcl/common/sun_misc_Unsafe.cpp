@@ -34,6 +34,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #include "ArrayCopyHelpers.hpp"
 #include "AtomicSupport.hpp"
@@ -339,6 +340,9 @@ void JNICALL
 Java_sun_misc_Unsafe_park(JNIEnv *env, jobject receiver, jboolean isAbsolute, jlong time)
 {
 	J9VMThread *currentThread = (J9VMThread *)env;
+	if (getenv("AA_TraceUPMon")){
+		fprintf(stderr, "AA_TraceUPMon0.1: Java_sun_misc_Unsafe_park Entry by thread %p\n", currentThread);
+	}
 	J9JavaVM *vm = currentThread->javaVM;
 	J9InternalVMFunctions *vmFuncs = vm->internalVMFunctions;
 	vmFuncs->internalEnterVMFromJNI(currentThread);
@@ -793,19 +797,14 @@ Java_sun_misc_Unsafe_shouldBeInitialized(JNIEnv *env, jobject receiver, jclass c
 }
 
 #if JAVA_SPEC_VERSION >= 10
-/* The return value needs to be freed.
- * The caller should have VM access.
- */
+/* The return value needs to be freed. */
 static char *
 createErrorMsgHelper(JNIEnv *env, jclass clazz, jstring name, const char *message)
 {
 	J9VMThread *currentThread = (J9VMThread *)env;
-	J9InternalVMFunctions *vmFuncs = currentThread->javaVM->internalVMFunctions;
 	PORT_ACCESS_FROM_ENV(env);
 	J9UTF8 *className = J9ROMCLASS_CLASSNAME(J9VM_J9CLASS_FROM_JCLASS(currentThread, clazz)->romClass);
-	vmFuncs->internalExitVMToJNI(currentThread);
 	const char *nameUTF = env->GetStringUTFChars(name, NULL);
-	vmFuncs->internalEnterVMFromJNI(currentThread);
 	size_t namelen = strlen(nameUTF);
 	size_t msglen = strlen(message) + 1; /* include the NULL */
 	size_t totallen = namelen + J9UTF8_LENGTH(className) + msglen + 1; /* include the '.' */

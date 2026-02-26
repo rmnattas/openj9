@@ -24,6 +24,7 @@
 
 #include "j9protos.h"
 #include "j9consts.h"
+#include <stdlib.h>
 
 extern "C" {
 
@@ -31,6 +32,9 @@ extern "C" {
 void JNICALL
 Fast_sun_misc_Unsafe_park(J9VMThread *currentThread, jboolean isAbsolute, jlong time)
 {
+	if (getenv("AA_TraceUPMon")){
+		fprintf(stderr, "AA_TraceUPMon0.2: Fast_sun_misc_Unsafe_park Entry by thread %p\n", currentThread);
+	}
 	threadParkImpl(currentThread, isAbsolute ? TRUE : FALSE, (I_64)time);
 }
 

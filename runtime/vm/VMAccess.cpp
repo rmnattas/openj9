@@ -1083,6 +1083,9 @@ void
 internalEnterVMFromJNI(J9VMThread *currentThread)
 {
 	currentThread->inNative = FALSE;
+	if (getenv("AA_TraceUPMon")){
+		fprintf(stderr, "AA_TraceUPMon1.1: internalEnterVMFromJNI Enter by thread %p\n", currentThread);
+	}
 	VM_AtomicSupport::readWriteBarrier(); // necessary?
 	if (J9_UNEXPECTED(currentThread->publicFlags != J9_PUBLIC_FLAGS_VM_ACCESS)) {
 		omrthread_monitor_t const publicFlagsMutex = currentThread->publicFlagsMutex;
@@ -1096,8 +1099,14 @@ internalEnterVMFromJNI(J9VMThread *currentThread)
 				internalReleaseVMAccessNoMutex(currentThread);
 			}
 		}
+		if (getenv("AA_TraceUPMon")){
+			fprintf(stderr, "AA_TraceUPMon1.2: internalEnterVMFromJNI Lock by thread %p\n", currentThread);
+		}
 		if (!J9_ARE_ANY_BITS_SET(currentThread->publicFlags, J9_PUBLIC_FLAGS_VM_ACCESS)) {
 			internalAcquireVMAccessNoMutex(currentThread);
+			if (getenv("AA_TraceUPMon")){
+				fprintf(stderr, "AA_TraceUPMon1.3: internalEnterVMFromJNI Acquire by thread %p\n", currentThread);
+			}
 		}
 		omrthread_monitor_exit_using_threadId(publicFlagsMutex, osThread);
 	}

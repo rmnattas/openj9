@@ -1804,7 +1804,18 @@ bool TR_J9VMBase::getNurserySpaceBounds(uintptr_t *base, uintptr_t *top)
    return true;
    }
 
-bool TR_J9VMBase::jniRetainVMAccess(TR_ResolvedMethod *method) { return (((TR_ResolvedJ9Method *)method)->getJNIProperties() & J9_FAST_JNI_RETAIN_VM_ACCESS) != 0; }
+bool TR_J9VMBase::jniRetainVMAccess(TR_ResolvedMethod *method) { 
+   uintptr_t temp = ((TR_ResolvedJ9Method *)method)->getJNIProperties() & J9_FAST_JNI_RETAIN_VM_ACCESS;
+   if (getenv("AA_TraceUPMon")){
+		fprintf(stderr, "AA_TraceUPMon4.1: jniRetainVMAccess Entry (getJNIProperties 0x%02x)\n", (unsigned int)((TR_ResolvedJ9Method *)method)->getJNIProperties());
+      if (temp != 0)
+         fprintf(stderr, "AA_TraceUPMon4.2: jniRetainVMAccess Return TURE for method %s.%s%s\n", method->classNameChars(),method->nameChars(), method->signatureChars());
+      else
+         fprintf(stderr, "AA_TraceUPMon4.3: jniRetainVMAccess Return FALSE for method %s.%s%s\n", method->classNameChars(),method->nameChars(), method->signatureChars());
+	}
+   return (temp) != 0; 
+}
+
 bool TR_J9VMBase::jniNoGCPoint(TR_ResolvedMethod *method) { return (((TR_ResolvedJ9Method *)method)->getJNIProperties() & J9_FAST_JNI_NOT_GC_POINT) != 0; }
 bool TR_J9VMBase::jniNoNativeMethodFrame(TR_ResolvedMethod *method) { return (((TR_ResolvedJ9Method *)method)->getJNIProperties() & J9_FAST_NO_NATIVE_METHOD_FRAME) != 0; }
 bool TR_J9VMBase::jniNoExceptionsThrown(TR_ResolvedMethod *method) { return (((TR_ResolvedJ9Method *)method)->getJNIProperties() & J9_FAST_JNI_NO_EXCEPTION_THROW) != 0; }

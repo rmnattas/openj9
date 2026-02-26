@@ -160,6 +160,14 @@ TR::Register *J9::Power::JNILinkage::buildDirectDispatch(TR::Node *callNode)
       resolvedMethodSymbol = callNode->getSymbol()->castToResolvedMethodSymbol();
       resolvedMethod = resolvedMethodSymbol->getResolvedMethod();
       dropVMAccess = !fej9->jniRetainVMAccess(resolvedMethod);
+      if (getenv("AA_TraceUPMon")){
+         if (!dropVMAccess)
+			   fprintf(stderr, "AA_TraceUPMon5.1: buildDirectDispatch jniRetainVMAccess TRUE for method %s.%s%s called from %s.%s%s\n", resolvedMethod->classNameChars(),resolvedMethod->nameChars(), resolvedMethod->signatureChars(),
+         comp()->getCurrentMethod()->classNameChars(),comp()->getCurrentMethod()->nameChars(), comp()->getCurrentMethod()->signatureChars());
+         else
+            fprintf(stderr, "AA_TraceUPMon5.2: buildDirectDispatch jniRetainVMAccess FALSE for method %s.%s%s called from %s.%s%s\n", resolvedMethod->classNameChars(),resolvedMethod->nameChars(), resolvedMethod->signatureChars(),
+         comp()->getCurrentMethod()->classNameChars(),comp()->getCurrentMethod()->nameChars(), comp()->getCurrentMethod()->signatureChars());
+		}
       isJNIGCPoint = !fej9->jniNoGCPoint(resolvedMethod);
       killNonVolatileGPRs = isJNIGCPoint;
       checkExceptions = !fej9->jniNoExceptionsThrown(resolvedMethod);
