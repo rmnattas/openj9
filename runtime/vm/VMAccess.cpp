@@ -1085,6 +1085,7 @@ internalEnterVMFromJNI(J9VMThread *currentThread)
 	currentThread->inNative = FALSE;
 	if (getenv("AA_TraceUPMon")){
 		fprintf(stderr, "AA_TraceUPMon1.1: internalEnterVMFromJNI Enter by thread %p\n", currentThread);
+		fprintf(stderr, "AA_TraceUPMon1.4: internalEnterVMFromJNI Flag by thread 0x%08x\n", (unsigned int)currentThread->publicFlags);
 	}
 	VM_AtomicSupport::readWriteBarrier(); // necessary?
 	if (J9_UNEXPECTED(currentThread->publicFlags != J9_PUBLIC_FLAGS_VM_ACCESS)) {
