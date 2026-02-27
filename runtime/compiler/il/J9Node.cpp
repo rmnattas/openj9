@@ -372,7 +372,7 @@ J9::Node::processJNICall(TR::TreeTop *callNodeTreeTop, TR::ResolvedMethodSymbol 
    // optimized helpers in the JIT library using what amounts to system/C dispatch.
    // The addresses of the optimized helpers in the server process will not necessarily
    // match the client-side addresses, so we can't take this shortcut in JITServer mode.
-   if (((methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_update) ||
+   if ( false && ((methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_update) ||
 #if JAVA_SPEC_VERSION <= 8
         (methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateBytes) ||
         (methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateByteBuffer)) &&
