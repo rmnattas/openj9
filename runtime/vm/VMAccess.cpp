@@ -1084,7 +1084,7 @@ internalEnterVMFromJNI(J9VMThread *currentThread)
 {
 	currentThread->inNative = FALSE;
 	VM_AtomicSupport::readWriteBarrier(); // necessary?
-	if (J9_UNEXPECTED(currentThread->publicFlags != J9_PUBLIC_FLAGS_VM_ACCESS)) {
+	if (J9_UNEXPECTED((currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS) != J9_PUBLIC_FLAGS_VM_ACCESS)) {
 		omrthread_monitor_t const publicFlagsMutex = currentThread->publicFlagsMutex;
 		omrthread_t const osThread = currentThread->osThread;
 		omrthread_monitor_enter_using_threadId(publicFlagsMutex, osThread);

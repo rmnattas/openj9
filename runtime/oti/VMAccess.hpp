@@ -343,7 +343,7 @@ public:
 #else /* J9VM_INTERP_ATOMIC_FREE_JNI_USES_FLUSH */
 		VM_AtomicSupport::readWriteBarrier(); // necessary?
 #endif /* J9VM_INTERP_ATOMIC_FREE_JNI_USES_FLUSH */
-		if (J9_UNEXPECTED(currentThread->publicFlags != J9_PUBLIC_FLAGS_VM_ACCESS))	{
+		if (J9_UNEXPECTED((currentThread->publicFlags & J9_PUBLIC_FLAGS_VM_ACCESS) != J9_PUBLIC_FLAGS_VM_ACCESS))	{
 			J9_VM_FUNCTION(currentThread, internalEnterVMFromJNI)(currentThread);
 		}
 	}
