@@ -1709,13 +1709,18 @@ public final class String implements Serializable, Comparable<String>, CharSeque
 				} else {
 					helpers.putObjectInObject(s1, valueFieldOffset, value2);
 				}
-			} else {
+			} else if (com.ibm.oti.vm.VM.J9_JIT_STRING_DEDUP_POLICY == com.ibm.oti.vm.VM.J9_JIT_STRING_DEDUP_POLICY_FAVOUR_HIGHER) {
 				if (helpers.acmplt(value2, value1)) {
 					helpers.putObjectInObject(s2, valueFieldOffset, value1);
 				} else {
 					helpers.putObjectInObject(s1, valueFieldOffset, value2);
 				}
-			}
+			} else { // J9_JIT_STRING_DEDUP_POLICY_FAVOUR_OLDER
+				if (com.ibm.oti.vm.VM.isOlder(value1, value2) > 0) {
+					helpers.putObjectInObject(s2, valueFieldOffset, value1);
+				} else { // value2 is older or same age.
+					helpers.putObjectInObject(s1, valueFieldOffset, value2);
+				}
 		}
 	}
 

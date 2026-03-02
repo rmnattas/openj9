@@ -101,6 +101,7 @@ public final class VM {
 	 *  - J9_JIT_STRING_DEDUP_POLICY_DISABLED
 	 *  - J9_JIT_STRING_DEDUP_POLICY_FAVOUR_HIGHER
 	 *  - J9_JIT_STRING_DEDUP_POLICY_FAVOUR_LOWER
+	 *  - J9_JIT_STRING_DEDUP_POLICY_FAVOUR_OLDER
 	 */
 	public static final int J9_JIT_STRING_DEDUP_POLICY;
 
@@ -108,6 +109,7 @@ public final class VM {
 	public static final int J9_JIT_STRING_DEDUP_POLICY_DISABLED = 0;
 	public static final int J9_JIT_STRING_DEDUP_POLICY_FAVOUR_LOWER = 1;
 	public static final int J9_JIT_STRING_DEDUP_POLICY_FAVOUR_HIGHER = 2;
+	public static final int J9_JIT_STRING_DEDUP_POLICY_FAVOUR_OLDER = 3;
 
 	/* Determines whether String compression is enabled at VM startup */
 	public static final boolean J9_STRING_COMPRESSION_ENABLED;
@@ -460,6 +462,16 @@ public static native void localGC();
  * This method will cause the GC to do a global collection.
  */
 public static native void globalGC();
+
+/**
+ * This method will return which object is older than the other.
+ * 
+ * @param o1 fisrt object
+ * @param o2 second object
+ *
+ * @return 1 if object1 is older, -1 if object2 is older, 0 if no object or same age
+ */
+public static native int isOlder(Object o1, Object o2);
 
 /**
  * Answer if native implementations should be used.
