@@ -1597,6 +1597,8 @@ gcParseXXgcArguments(J9JavaVM *vm, char *optArg)
 				extensions->stringDedupPolicy = MM_GCExtensions::J9_JIT_STRING_DEDUP_POLICY_FAVOUR_LOWER;
 			} else if (try_scan(&scan_start, "favourHigher")) {
 				extensions->stringDedupPolicy = MM_GCExtensions::J9_JIT_STRING_DEDUP_POLICY_FAVOUR_HIGHER;
+			} else if (try_scan(&scan_start, "favourOlder")) {
+				extensions->stringDedupPolicy = MM_GCExtensions::J9_JIT_STRING_DEDUP_POLICY_FAVOUR_OLDER;
 			} else {
 				returnValue = JNI_EINVAL;
 				break;

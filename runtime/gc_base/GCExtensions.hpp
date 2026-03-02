@@ -206,13 +206,14 @@ public:
 	bool dynamicHeapAdjustmentForRestore; /**< If set to true, the default heuristic-calculated softmx is prioritized over the user-specified values. */
 	/**
 	 * Values for com.ibm.oti.vm.VM.J9_JIT_STRING_DEDUP_POLICY
-	 * must hava the same values as J9_JIT_STRING_DEDUP_POLICY_DISABLED, J9_JIT_STRING_DEDUP_POLICY_FAVOUR_LOWER and J9_JIT_STRING_DEDUP_POLICY_FAVOUR_HIGHER.
+	 * must hava the same values as J9_JIT_STRING_DEDUP_POLICY_DISABLED, J9_JIT_STRING_DEDUP_POLICY_FAVOUR_LOWER, J9_JIT_STRING_DEDUP_POLICY_FAVOUR_HIGHER and J9_JIT_STRING_DEDUP_POLICY_FAVOUR_OLDER.
 	 */
 	enum JitStringDeDupPolicy {
 		J9_JIT_STRING_DEDUP_POLICY_DISABLED = 0,
 		J9_JIT_STRING_DEDUP_POLICY_FAVOUR_LOWER = 1,
 		J9_JIT_STRING_DEDUP_POLICY_FAVOUR_HIGHER = 2,
-		J9_JIT_STRING_DEDUP_POLICY_UNDEFINED = 3,
+		J9_JIT_STRING_DEDUP_POLICY_FAVOUR_OLDER = 3,
+		J9_JIT_STRING_DEDUP_POLICY_UNDEFINED = 4,
 	};
 	JitStringDeDupPolicy stringDedupPolicy;
 

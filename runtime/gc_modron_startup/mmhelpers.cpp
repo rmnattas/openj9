@@ -126,6 +126,8 @@ j9gc_get_jit_string_dedup_policy(J9JavaVM *javaVM)
 				}
 			}
 #endif /* J9VM_GC_MODRON_SCAVENGER */
+		} else if (extensions->isVLHGC()) {
+			result = MM_GCExtensions::J9_JIT_STRING_DEDUP_POLICY_FAVOUR_OLDER;
 		}
 		return (I_32) result;
 	} else {
