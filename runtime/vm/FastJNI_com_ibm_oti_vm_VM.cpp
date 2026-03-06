@@ -149,6 +149,24 @@ Fast_com_ibm_oti_vm_VM_isBootstrapClassLoader(J9VMThread *currentThread, j9objec
 	return isBoot;
 }
 
+jint JNICALL
+Java_com_ibm_oti_vm_VM_isOlder(JNIEnv *env, jclass unused, jobject jobject1, jobject jobject2)
+{
+	jint older = 0;
+
+	J9VMThread *currentThread = (J9VMThread*)env;
+	J9JavaVM *vm = currentThread->javaVM;
+	J9InternalVMFunctions *vmFuncs = vm->internalVMFunctions;
+
+	// vmFuncs->internalEnterVMFromJNI(currentThread);
+	j9object_t object1 = J9_JNI_UNWRAP_REFERENCE(jobject1);
+	j9object_t object2 = J9_JNI_UNWRAP_REFERENCE(jobject2);
+	older = (jint)vm->memoryManagerFunctions->j9gc_is_older(currentThread, object1, object2);
+	// vmFuncs->internalExitVMToJNI(currentThread);
+
+	return older;
+}
+
 J9_FAST_JNI_METHOD_TABLE(com_ibm_oti_vm_VM)
 	J9_FAST_JNI_METHOD("findClassOrNull", "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/Class;", Fast_java_lang_VMAccess_findClassOrNull,
 		J9_FAST_JNI_RETAIN_VM_ACCESS | J9_FAST_JNI_DO_NOT_WRAP_OBJECTS | J9_FAST_JNI_DO_NOT_PASS_RECEIVER)
@@ -163,6 +181,8 @@ J9_FAST_JNI_METHOD_TABLE(com_ibm_oti_vm_VM)
 	J9_FAST_JNI_METHOD("isBootstrapClassLoader", "(Ljava/lang/ClassLoader;)Z", Fast_com_ibm_oti_vm_VM_isBootstrapClassLoader,
 		J9_FAST_JNI_RETAIN_VM_ACCESS | J9_FAST_JNI_NOT_GC_POINT | J9_FAST_JNI_NO_NATIVE_METHOD_FRAME | J9_FAST_JNI_NO_EXCEPTION_THROW |
 		J9_FAST_JNI_NO_SPECIAL_TEAR_DOWN | J9_FAST_JNI_DO_NOT_WRAP_OBJECTS | J9_FAST_JNI_DO_NOT_PASS_RECEIVER)
+	J9_FAST_JNI_METHOD("isOlder", "(Ljava/lang/Object;Ljava/lang/Object;)I", Fast_com_ibm_oti_vm_VM_isOlder,
+		J9_FAST_JNI_RETAIN_VM_ACCESS | J9_FAST_JNI_NOT_GC_POINT | J9_FAST_JNI_NO_EXCEPTION_THROW)
 J9_FAST_JNI_METHOD_TABLE_END
 
 }
