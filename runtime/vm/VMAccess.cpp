@@ -1082,9 +1082,15 @@ mustHaveVMAccess(J9VMThread * vmThread)
 void
 internalEnterVMFromJNI(J9VMThread *currentThread)
 {
+	if (getenv("AA_TraceUPMon")){
+		fprintf(stderr, "AA_TraceUPMon1.1: internalEnterVMFromJNI Enter by thread %p (flag = 0x%08x)\n", currentThread, (unsigned int)currentThread->publicFlags);
+	}
 	currentThread->inNative = FALSE;
 	VM_AtomicSupport::readWriteBarrier(); // necessary?
 	if (J9_UNEXPECTED(currentThread->publicFlags != J9_PUBLIC_FLAGS_VM_ACCESS)) {
+		if (getenv("AA_TraceUPMon")){
+			fprintf(stderr, "AA_TraceUPMon1.2: internalEnterVMFromJNI slowpath by thread %p\n", currentThread);
+		}
 		omrthread_monitor_t const publicFlagsMutex = currentThread->publicFlagsMutex;
 		omrthread_t const osThread = currentThread->osThread;
 		omrthread_monitor_enter_using_threadId(publicFlagsMutex, osThread);
@@ -1097,6 +1103,9 @@ internalEnterVMFromJNI(J9VMThread *currentThread)
 			}
 		}
 		if (!J9_ARE_ANY_BITS_SET(currentThread->publicFlags, J9_PUBLIC_FLAGS_VM_ACCESS)) {
+			if (getenv("AA_TraceUPMon")){
+				fprintf(stderr, "AA_TraceUPMon1.3: internalEnterVMFromJNI slowpath by thread %p\n", currentThread);
+			}
 			internalAcquireVMAccessNoMutex(currentThread);
 		}
 		omrthread_monitor_exit_using_threadId(publicFlagsMutex, osThread);
