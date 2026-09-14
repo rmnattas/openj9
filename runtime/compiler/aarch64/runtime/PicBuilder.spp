@@ -1123,7 +1123,6 @@ L_iTableLoop:
 #endif /* ~NO_ITABLEWALK_CHECK */
 	// ITable entry is a match
 L_hitITable:
-	b	L_callHelper // @@ for debug @@
 	ldr	x11, [x30, #J9TR_ICSnippet_ITableIndex]		// Load the itable offset from the snippet
 	tst	x11, #J9TR_J9_ITABLE_OFFSET_TAG_BITS		// Call the helper if the itable offset is tagged
 	bne	L_callHelper
@@ -1131,8 +1130,6 @@ L_hitITable:
 	neg	x11, x11
 	add	x11, x11, #J9TR_InterpVTableOffset		// Convert to a JIT vft offset
 	ldr	x12, [x14, x11]					// Load the method
-	mov	x16, x12 // @@ for debug @@
-	mov	x17, x30 // @@ for debug @@
 	br	x12						// Call the method (control does not return here)
 
 L_callHelper:
