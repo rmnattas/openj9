@@ -83,6 +83,7 @@
 
 #define LOCK_INC_DEC_VALUE                                OBJECT_HEADER_LOCK_FIRST_RECURSION_BIT
 #define LOCK_RESERVATION_BIT                              OBJECT_HEADER_LOCK_RESERVED
+#define LOCK_LRN_RES_BITS                                 (OBJECT_HEADER_LOCK_LEARNING | OBJECT_HEADER_LOCK_RESERVED)
 
 #define LOCK_RES_PRIMITIVE_ENTER_MASK                     (OBJECT_HEADER_LOCK_RECURSION_MASK | OBJECT_HEADER_LOCK_FLC)
 #define LOCK_RES_PRIMITIVE_EXIT_MASK                      (OBJECT_HEADER_LOCK_BITS_MASK & ~OBJECT_HEADER_LOCK_RECURSION_MASK)
@@ -7367,6 +7368,18 @@ TR::Register *J9::Power::TreeEvaluator::VMmonentEvaluator(TR::Node *node, TR::Co
       return targetRegister;
       }
 
+   TR::SimpleRegex *glrBlocklistRegex = comp->getOptions()->getGLRBlocklist();
+   TR_OpaqueClassBlock *classPointer = (TR_OpaqueClassBlock *) cg->getMonClass(node);
+   const char *className = classPointer ? TR::Compiler->cls.classSignature(comp, classPointer, cg->trMemory()) : "unknown";
+   bool blockGLR = false;
+   if ((glrBlocklistRegex != NULL) && (classPointer != NULL))
+      {
+      if (TR::SimpleRegex::match(glrBlocklistRegex, className))
+         {
+         blockGLR = true;
+         }
+      }
+
    int32_t numDeps = 6;
 
    TR::Node *objNode = node->getFirstChild();
@@ -7614,13 +7627,29 @@ TR::Register *J9::Power::TreeEvaluator::VMmonentEvaluator(TR::Node *node, TR::Co
 
       generateTrg1MemInstruction(cg, loadOpCode, node, monitorReg, TR::MemoryReference::createWithDisplacement(cg, baseReg, lwOffset, lockSize));
 
-      generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, monitorReg, 0);
+      if (blockGLR)
+         {
+         generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::ori, node, tempReg, monitorReg, LOCK_LRN_RES_BITS);
+         generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, tempReg, LOCK_LRN_RES_BITS);
+         }
+      else
+         {
+         generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, monitorReg, 0);
+         }
       generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, incrementCheckLabel, condReg);
       generateTrg1ImmInstruction(cg, TR::InstOpCode::li, node, offsetReg, lwOffset);
 
       generateLabelInstruction(cg, TR::InstOpCode::label, node, loopLabel);
       generateTrg1MemInstruction(cg, reservedLoadOpCode, PPCOpProp_LoadReserveExclusiveAccess, node, monitorReg, TR::MemoryReference::createWithIndexReg(cg, baseReg, offsetReg, lockSize));
-      generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, monitorReg, 0);
+      if (blockGLR)
+         {
+         generateTrg1Src1ImmInstruction(cg, TR::InstOpCode::ori, node, tempReg, monitorReg, LOCK_LRN_RES_BITS);
+         generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, tempReg, LOCK_LRN_RES_BITS);
+         }
+      else
+         {
+         generateTrg1Src1ImmInstruction(cg, compareLogicalImmOpCode, node, condReg, monitorReg, 0);
+         }
       generateConditionalBranchInstruction(cg, TR::InstOpCode::bne, node, callLabel, condReg);
       generateMemSrc1Instruction(cg, conditionalStoreOpCode, node, TR::MemoryReference::createWithIndexReg(cg, baseReg, offsetReg, lockSize), metaReg);
 
