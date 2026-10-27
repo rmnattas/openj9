@@ -939,11 +939,6 @@ void J9::Power::PrivateLinkage::createPrologue(TR::Instruction *cursor)
                 cursor = generateTrg1Instruction(cg(), TR::InstOpCode::mflr, firstNode, gr0, cursor);
             }
 
-            // Check for stack overflow (set a flag)
-            if (!comp()->isDLT())
-                cursor = generateTrg1Src2Instruction(cg(), TR::InstOpCode::Op_cmpl, firstNode, cr0, stackPtr, gr11,
-                    cursor);
-
             if (saveLR) {
                 // javaSP[totalFrameSize] <- linkRegister
                 cursor = generateMemSrc1Instruction(cg(), TR::InstOpCode::Op_stx, firstNode,
@@ -961,11 +956,6 @@ void J9::Power::PrivateLinkage::createPrologue(TR::Instruction *cursor)
                 cursor = generateTrg1Instruction(cg(), TR::InstOpCode::mflr, firstNode, gr0, cursor);
             }
 
-            // Check for stack overflow (set a flag)
-            if (!comp()->isDLT())
-                cursor = generateTrg1Src2Instruction(cg(), TR::InstOpCode::Op_cmpl, firstNode, cr0, stackPtr, gr11,
-                    cursor);
-
             if (saveLR) {
                 // javaSP[totalFrameSize] <- linkRegister
                 cursor = generateMemSrc1Instruction(cg(), TR::InstOpCode::Op_st, firstNode,
@@ -974,17 +964,14 @@ void J9::Power::PrivateLinkage::createPrologue(TR::Instruction *cursor)
                     gr0, cursor);
             }
         }
-    } else {
-        // Empty Frame Support
-
-        // Check for stack overflow (set a flag)
-        if (!comp()->isDLT())
-            cursor = generateTrg1Src2Instruction(cg(), TR::InstOpCode::Op_cmpl, firstNode, cr0, stackPtr, gr11, cursor);
     }
 
     if (!comp()->isDLT()) {
         TR::LabelSymbol *snippetLabel = generateLabelSymbol(cg());
         TR::LabelSymbol *reStartLabel = generateLabelSymbol(cg());
+
+        // Check for stack overflow (set a flag)
+        cursor = generateTrg1Src2Instruction(cg(), TR::InstOpCode::Op_cmpl, firstNode, cr0, stackPtr, gr11, cursor);
 
         // Branch to StackOverflow snippet if javaSP > stack limit
         if (comp()->target().cpu.isAtLeast(OMR_PROCESSOR_PPC_GP))
