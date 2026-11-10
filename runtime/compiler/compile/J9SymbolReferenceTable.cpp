@@ -2054,7 +2054,6 @@ TR::SymbolReference *J9::SymbolReferenceTable::findOrCreateUnsafeSymbolRef(TR::D
     if (symRef == NULL) {
         TR::Symbol *sym = TR::Symbol::createShadow(trHeapMemory(), type);
         sym->setUnsafeShadowSymbol();
-        sym->setArrayShadowSymbol();
         sym->setMemoryOrdering(ordering);
         (*unsafeSymRefs)[type] = symRef = new (trHeapMemory())
             TR::SymbolReference(self(), sym, comp()->getMethodSymbol()->getResolvedMethodIndex(), -1);
