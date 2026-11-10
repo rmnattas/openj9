@@ -345,7 +345,7 @@ TR::Node *J9::Node::processJNICall(TR::TreeTop *callNodeTreeTop, TR::ResolvedMet
                     || (methodSymbol->getRecognizedMethod() == TR::java_util_zip_CRC32_updateByteBuffer0))
                 &&
 #endif
-                (!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled())))) {
+                !TR::Compiler->om.canGenerateArraylets()))) {
         return self();
     }
 #endif

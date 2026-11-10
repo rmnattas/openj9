@@ -5594,8 +5594,18 @@ static TR::Register *inlineCRC32CUpdateBytes(TR::Node *node, TR::CodeGenerator *
     const OP::Mnemonic crc32DoubleWordOp = isCRC32C ? OP::crc32cx : OP::crc32x;
 
     TR::Register *inputReg = cg->gprClobberEvaluate(inputNode);
-    TR::Register *arrayReg = cg->evaluate(arrayNode);
+    TR::Register *arrayReg = cg->gprClobberEvaluate(arrayNode);
+    uint32_t headerSize = isRawAddress ? 0 : TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
     TR_ARM64ScratchRegisterManager *srm = cg->generateScratchRegisterManager();
+
+#if defined(J9VM_GC_SPARSE_HEAP_ALLOCATION)
+    if (!isRawAddress && TR::Compiler->om.isOffHeapAllocationEnabled()) {
+        // Load dataAddr into arrayReg and set headerSize to 0
+        Inst_Trg1Mem(cg, OP::ldrimmx, node, arrayReg,
+            MRef_disp(cg, arrayReg, cg->comp()->fej9()->getOffsetOfContiguousDataAddrField()));
+        headerSize = 0;
+    }
+#endif /* J9VM_GC_SPARSE_HEAP_ALLOCATION */
 
     if (!isCRC32C) {
         Inst_Mvn(cg, node, inputReg, inputReg, false);
@@ -5616,7 +5626,7 @@ static TR::Register *inlineCRC32CUpdateBytes(TR::Node *node, TR::CodeGenerator *
              * The code below assumes that the start address of the array data is 8 bytes aligned.
              * If the array header size plus offset is a multiple of 8, the base address is 8 bytes aligned.
              */
-            uint32_t index = off + TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
+            uint32_t index = off + headerSize;
             /*
              * If the length is large enough, unroll the loop of 8 bytes loads and crc32 calculations.
              * We make sure that index is 8 bytes aligned for 8 bytes loads if unrolling.
@@ -5807,7 +5817,7 @@ static TR::Register *inlineCRC32CUpdateBytes(TR::Node *node, TR::CodeGenerator *
         bool alignmentCheckNeeded = true;
         if (isConstOff && (!isRawAddress)) {
             const uint32_t off = offsetNode->getInt();
-            uint32_t realoff = off + TR::Compiler->om.contiguousArrayHeaderSizeInBytes();
+            uint32_t realoff = off + headerSize;
             /*
              * Assuming array address is 8 bytes aligned,
              * we do not have to test alignment of baseReg if offset is 8 bytes aligned.
@@ -5836,11 +5846,10 @@ static TR::Register *inlineCRC32CUpdateBytes(TR::Node *node, TR::CodeGenerator *
             }
         } else {
             TR::Register *offReg = cg->evaluate(offsetNode);
-            if (!isRawAddress) {
-                Inst_Trg1Src1Imm(cg, OP::addimmx, node, baseReg, arrayReg,
-                    TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+            if (headerSize != 0) {
+                Inst_Trg1Src1Imm(cg, OP::addimmx, node, arrayReg, arrayReg, headerSize);
             }
-            Inst_Trg1Src2(cg, OP::addx, node, baseReg, isRawAddress ? arrayReg : baseReg, offReg);
+            Inst_Trg1Src2(cg, OP::addx, node, baseReg, arrayReg, offReg);
             if (isCRC32C) {
                 Inst_Trg1Src2(cg, OP::subw, node, sizeLeftReg, endOrLenReg, offReg);
             } else {
@@ -6101,6 +6110,7 @@ static TR::Register *inlineCRC32CUpdateBytes(TR::Node *node, TR::CodeGenerator *
         Inst_Mvn(cg, node, inputReg, inputReg, false);
     }
     srm->stopUsingRegisters();
+    cg->stopUsingRegister(arrayReg);
     node->setRegister(inputReg);
     cg->decReferenceCount(inputNode);
     cg->decReferenceCount(arrayNode);
@@ -7731,7 +7741,7 @@ bool J9::ARM64::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&r
             case TR::java_util_zip_CRC32_updateBytes:
 #endif
             {
-                if (!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled()
+                if (!TR::Compiler->om.canGenerateArraylets()
                     && cg->comp()->target().cpu.supportsFeature(OMR_FEATURE_ARM64_CRC32) && (!disableCRC32)) {
                     resultReg = inlineCRC32CUpdateBytes(node, cg, false, false);
                     return true;
@@ -7741,7 +7751,7 @@ bool J9::ARM64::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&r
 #endif /* OSX */
 
             case TR::java_util_zip_CRC32C_updateBytes: {
-                if (!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled()
+                if (!TR::Compiler->om.canGenerateArraylets()
                     && cg->comp()->target().cpu.supportsFeature(OMR_FEATURE_ARM64_CRC32) && (!disableCRC32)) {
                     resultReg = inlineCRC32CUpdateBytes(node, cg, false, true);
                     return true;
@@ -7756,7 +7766,7 @@ bool J9::ARM64::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&r
             case TR::java_util_zip_CRC32_updateByteBuffer:
 #endif
             {
-                if (!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled()
+                if (!TR::Compiler->om.canGenerateArraylets()
                     && cg->comp()->target().cpu.supportsFeature(OMR_FEATURE_ARM64_CRC32) && (!disableCRC32)) {
                     resultReg = inlineCRC32CUpdateBytes(node, cg, true, false);
                     return true;
@@ -7766,7 +7776,7 @@ bool J9::ARM64::CodeGenerator::inlineDirectCall(TR::Node *node, TR::Register *&r
 #endif /* OSX */
 
             case TR::java_util_zip_CRC32C_updateDirectByteBuffer: {
-                if (!TR::Compiler->om.canGenerateArraylets() && !TR::Compiler->om.isOffHeapAllocationEnabled()
+                if (!TR::Compiler->om.canGenerateArraylets()
                     && cg->comp()->target().cpu.supportsFeature(OMR_FEATURE_ARM64_CRC32) && (!disableCRC32)) {
                     resultReg = inlineCRC32CUpdateBytes(node, cg, true, true);
                     return true;
